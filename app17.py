@@ -46,7 +46,7 @@ if st.session_state["authenticated"]:
         st.experimental_set_query_params()  # Reset the app state
 
     # Your existing app code starts here
-    st.title("InGenius Prep - Counselor Matchmaking")
+    # st.title("InGenius Prep - Counselor Matchmaking")
 
     # Load the data from the uploaded Excel file
     file_path = 'FAO and GC Information.xlsx'
@@ -210,20 +210,48 @@ if st.session_state["authenticated"]:
         </style>
     """, unsafe_allow_html=True)
 
-    # Logo and Title
+    # Center the logo using a container
+    with st.container():
+        col1, col2, col3 = st.columns([1, 2, 1]) 
+        with col2:
+            st.image(
+                "IGP Logo.png", 
+                use_column_width=False, 
+                width=600
+            )
+
+    # Add the title and tagline, centered
     st.markdown("""
-        <div class="logo-container">
-            <img src="https://ingeniusprep.com/wp-content/uploads/2023/09/Ingeniusprep-logo-1.png" alt="InGenius Prep Logo">
-            <h1>Counselor Matchmaking Platform</h1>
-            <div class="gradient-accent">
-                Find your College Counseling Team
-            </div>
+        <h1 style="text-align: center; color: #005CAA; font-size: 2.5em; margin-top: 0;">
+            Counselor Matchmaking Platform
+        </h1>
+        <div style="text-align: center; 
+                    background: linear-gradient(135deg, #005CAA, #4A90E2); 
+                    color: white; 
+                    padding: 15px 20px; 
+                    border-radius: 10px; 
+                    display: flex; 
+                    justify-content: center; 
+                    align-items: center; 
+                    font-size: 1.2em; 
+                    width: fit-content; 
+                    margin: 0 auto;">
+            Find Your College Counseling Team
         </div>
     """, unsafe_allow_html=True)
 
+
     # Step 1: Select Timezone
-    st.header("Step 1: Select Student's Timezone")
-    student_timezone = st.selectbox("Select the timezone of the student", timezones_options)
+    st.markdown("""
+        <p style="font-size: 1.5em; 
+                font-weight: bold; 
+                color: #005CAA; 
+                margin-bottom: 5px;"> 
+            Select the timezone of the student
+        </p>
+    """, unsafe_allow_html=True)
+
+    student_timezone = st.selectbox("", timezones_options)
 
     # Filter FAO and GC data based on the selected timezone
     student_timezone_cleaned = student_timezone.split(" ", 1)[1]  # Extract timezone abbreviation
