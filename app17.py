@@ -216,7 +216,7 @@ if st.session_state["authenticated"]:
             <img src="https://ingeniusprep.com/wp-content/uploads/2023/09/Ingeniusprep-logo-1.png" alt="InGenius Prep Logo">
             <h1>Counselor Matchmaking Platform</h1>
             <div class="gradient-accent">
-                Find Your Perfect Academic Guidance Partner
+                Find your College Counseling Team
             </div>
         </div>
     """, unsafe_allow_html=True)
@@ -234,7 +234,13 @@ if st.session_state["authenticated"]:
     def rank_input(label, available_ranks, key=None):
         """Render a rank input with restricted options."""
         st.markdown(f"**{label}**")
-        st.markdown('<span style="color: #757575; font-size: 0.9rem;">Choose a unique rank</span>', unsafe_allow_html=True)
+        st.markdown("""
+            <span style="color: #757575; font-size: 0.9rem;">
+            Assign a rank to this category based on its importance to you:
+            <br><strong>Rank 1:</strong> Represents your top-most priority category.
+            <br><strong>Subsequent Ranks (e.g., 2, 3...):</strong> Reflect progressively lower priority based on the assigned ranks.
+            </span>
+        """, unsafe_allow_html=True)
         rank = st.selectbox(label, available_ranks, key=key)
         return rank
 
@@ -265,12 +271,12 @@ if st.session_state["authenticated"]:
             )
 
             # Button to show the assign priority section
-            if st.button("Assign Priority for FAO"):
+            if st.button("Rank Preferences for FAO"):
                 st.session_state["show_fao_priority"] = True
 
         # Display FAO priority section in the same column
         if st.session_state["show_fao_priority"]:
-            st.subheader("Assign Priority for FAO Preferences")
+            st.subheader("Rank Preferences for FAO")
             fao_points = {}
             # Count non-empty categories, including Years of Experience and Admission Experience if selected
             num_categories = len([opts for opts in fao_preferences.values() if opts])
@@ -319,12 +325,12 @@ if st.session_state["authenticated"]:
             )
 
             # Button to show the assign priority section
-            if st.button("Assign Priority for GC"):
+            if st.button("Rank Preferences for GC"):
                 st.session_state["show_gc_priority"] = True
 
         # Display GC priority section in the same column
         if st.session_state["show_gc_priority"]:
-            st.subheader("Assign Priority for GC Preferences")
+            st.subheader("Rank Preferences for GC")
             gc_points = {}
             # Count non-empty categories, including Years of Experience and Admission Experience if selected
             num_categories = len([opts for opts in gc_preferences.values() if opts])
