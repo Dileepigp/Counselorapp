@@ -216,8 +216,7 @@ if st.session_state["authenticated"]:
         with col2:
             st.image(
                 "IGP Logo.png", 
-                use_column_width=False, 
-                width=600
+                use_container_width=True
             )
 
     # Add the title and tagline, centered
