@@ -132,9 +132,10 @@ if st.session_state["authenticated"]:
     timezones_options = [
         '🌏 Asia',
         '🌏 Australia/NZ',
-        '🌍 CST',
+        '🌍 CST',  
         '🌎 EST',
         '🌍 Europe',
+        '🌍 Arabian Standard Time',
         '🌍 MST',
         '🌍 PST'
     ]
