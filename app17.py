@@ -51,7 +51,7 @@ if st.session_state["authenticated"]:
     # st.title("InGenius Prep - Counselor Matchmaking")
 
     # Load the data from the uploaded Excel file
-    file_path = 'FAO and GC Details.xlsx'
+    file_path = 'FAO and GC Data.xlsx'
     fao_df = pd.read_excel(file_path, sheet_name='FAO')  # FAO sheet
     gc_df = pd.read_excel(file_path, sheet_name='GC')    # GC sheet
 
