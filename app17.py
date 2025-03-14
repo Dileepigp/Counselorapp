@@ -618,9 +618,28 @@ if st.session_state["authenticated"]:
 
     fao_df, gc_df = filter_incompatible_pairs(fao_df, gc_df)
 
-    # Display top 3 counselors after filtering
-    fao_top_matches = fao_df.sort_values(by="Score", ascending=False).head(3)
-    gc_top_matches = gc_df.sort_values(by="Score", ascending=False).head(3)
+    def filter_and_sort_counselors(df, package_type):
+        # Filter out entries with zero or negative spots available
+        if "AC" in package_type and '# AC spots left after recommendations' in df.columns:
+            df = df[df['# AC spots left after recommendations'] > 0]  # Filter out non-positive values
+            # Sort by '# AC spots left after recommendations' and 'Score' both in descending order
+            return df.sort_values(by=['# AC spots left after recommendations', 'Score'], ascending=[False, False])
+        elif "CB" in package_type and '# CB spots after recommendations' in df.columns:
+            df = df[df['# CB spots after recommendations'] > 0]  # Filter out non-positive values
+            # Sort by '# CB spots after recommendations' and 'Score' both in descending order
+            return df.sort_values(by=['# CB spots after recommendations', 'Score'], ascending=[False, False])
+        return df  # Return the dataframe unmodified if conditions are not met
+
+    # Apply this filtering and sorting logic after determining the available packages
+    if fao_package_available:
+        fao_df = filter_and_sort_counselors(fao_df, selected_fao_package)
+
+    if gc_package_available:
+        gc_df = filter_and_sort_counselors(gc_df, selected_gc_package)
+
+    # Assuming 'fao_df' and 'gc_df' are now properly filtered and sorted, find the top matches:
+    fao_top_matches = fao_df.head(3)  
+    gc_top_matches = gc_df.head(3)
 
 
 
