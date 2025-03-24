@@ -624,10 +624,10 @@ if st.session_state["authenticated"]:
             df = df[df['# AC spots left after recommendations'] > 0]  # Filter out non-positive values
             # Sort by '# AC spots left after recommendations' and 'Score' both in descending order
             return df.sort_values(by=['# AC spots left after recommendations', 'Score'], ascending=[False, False])
-        elif "CB" in package_type and '# CB spots after recommendations' in df.columns:
+        elif "CB" in package_type and '# CB spots left after recommendations' in df.columns:
             df = df[df['# CB spots after recommendations'] > 0]  # Filter out non-positive values
             # Sort by '# CB spots after recommendations' and 'Score' both in descending order
-            return df.sort_values(by=['# CB spots after recommendations', 'Score'], ascending=[False, False])
+            return df.sort_values(by=['# CB spots left after recommendations', 'Score'], ascending=[False, False])
         return df  # Return the dataframe unmodified if conditions are not met
 
     # Apply this filtering and sorting logic after determining the available packages
