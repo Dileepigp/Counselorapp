@@ -3,6 +3,9 @@ import pandas as pd
 from datetime import datetime
 import openpyxl
 import os
+import gspread
+from oauth2client.service_account import ServiceAccountCredentials
+from google.oauth2.service_account import Credentials
 
 # Set page configuration
 st.set_page_config(
@@ -13,7 +16,7 @@ st.set_page_config(
 
 # Authentication credentials
 USERNAME = "counselorapp"
-PASSWORD = "igpcsapp@#*25"
+PASSWORD = "igp123"
 
 # Authentication function
 def authenticate(username, password):
@@ -50,22 +53,48 @@ if st.session_state["authenticated"]:
     # Your existing app code starts here
     # st.title("InGenius Prep - Counselor Matchmaking")
 
-    # Load the data from the uploaded Excel file
-    file_path = 'FAO and GC Data.xlsx'
-    fao_df = pd.read_excel(file_path, sheet_name='FAO')  # FAO sheet
-    gc_df = pd.read_excel(file_path, sheet_name='GC')    # GC sheet
+    # Initialize Google Sheets Client
+    scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
 
-    fao_df.fillna("", inplace=True)
-    gc_df.fillna("", inplace=True)
+    # Function to clean comma-separated values in counselor data
+    def clean_counselor_data(df):
+        """Clean all string columns in counselor data (FAO/GC)"""
+        for col in df.columns:
+            if pd.api.types.is_string_dtype(df[col]):
+                # Clean individual comma-separated values
+                df[col] = df[col].apply(
+                    lambda x: ', '.join([item.strip() for item in str(x).split(',')]) 
+                    if pd.notnull(x) else x
+                )
+        return df
 
-    fao_df.columns = fao_df.columns.str.strip()
-    gc_df.columns = gc_df.columns.str.strip()
+    # Function to clean college rankings data
+    def clean_college_rankings(df):
+        """Clean only the COLLEGE column in rankings data"""
+        if 'COLLEGE' in df.columns:
+            df['COLLEGE'] = df['COLLEGE'].str.strip()
+        return df
 
-    # Load college rankings from the uploaded CSV file
-    college_rankings_file_path = 'Colleges Rankings.csv'
-    college_rankings_df = pd.read_csv(college_rankings_file_path)
+    # Load credentials and authorize
+    creds = Credentials.from_service_account_file('keys.json', scopes=scope)
+    client = gspread.authorize(creds)
 
-    # Extract the list of colleges
+    # Open spreadsheet and load worksheets
+    spreadsheet = client.open_by_key('19Ss02r7J93caq2aFxwv4F87OzeX0iIBpgf5v6v9dHTA')
+    fao_worksheet = spreadsheet.worksheet("UG FAOs")
+    gc_worksheet = spreadsheet.worksheet("US UG GCs")
+
+    # Load and clean counselor data
+    fao_df = clean_counselor_data(pd.DataFrame(fao_worksheet.get_all_records()))
+    gc_df = clean_counselor_data(pd.DataFrame(gc_worksheet.get_all_records()))
+
+    # Standard cleaning for both DataFrames
+    for df in [fao_df, gc_df]:
+        df.fillna("", inplace=True)
+        df.columns = df.columns.str.strip()
+
+    # Load and clean college rankings
+    college_rankings_df = clean_college_rankings(pd.read_csv('Colleges Rankings.csv'))
     Admission_experience_options = college_rankings_df['COLLEGE'].tolist()
 
     incompatible_counselors = {
@@ -242,18 +271,14 @@ if st.session_state["authenticated"]:
         </div>
     """, unsafe_allow_html=True)
 
-    keys_to_reset = [
-        'student_name', 'show_results', 'selected_fao', 'selected_gc',
-        'selection_sent', 'reset', 'personality_traits', 'degree_selection',
-        'subjects', 'timezones', 'packages', 'additional_filters'
-    ]
-
-    # Check if a reset is needed at the start of your script
+    # Reset logic at the top of your script
     if st.session_state.get('reset', False):
-        for key in keys_to_reset:
-            if key in st.session_state:
-                del st.session_state[key]
-        st.session_state['reset'] = False  # Clear the reset flag
+        # Clear ALL session state except authentication
+        auth_state = st.session_state.get('authenticated', False)
+        st.session_state.clear()
+        st.session_state['authenticated'] = auth_state
+        st.session_state['reset'] = False
+        st.rerun()
 
     # Input for student name
     student_name = st.text_input("Enter Student Name:", key="student_name", value="")
@@ -602,22 +627,23 @@ if st.session_state["authenticated"]:
     # Filter out incompatible pairs and resolve conflicts
     def filter_incompatible_pairs(fao_df, gc_df):
         for gc_name, fao_names in incompatible_counselors.items():
-            if gc_name in gc_df['Counselor Name'].values:
-                gc_counselor = gc_df.loc[gc_df['Counselor Name'] == gc_name]
+            if gc_name in gc_df['Name'].values:
+                gc_counselor = gc_df.loc[gc_df['Name'] == gc_name]
                 gc_score = gc_counselor['Score'].values[0]
                 for fao_name in fao_names:
-                    if fao_name in fao_df['Counselor Name'].values:
-                        fao_counselor = fao_df.loc[fao_df['Counselor Name'] == fao_name]
+                    if fao_name in fao_df['Name'].values:
+                        fao_counselor = fao_df.loc[fao_df['Name'] == fao_name]
                         fao_score = fao_counselor['Score'].values[0]
                         if gc_score > fao_score:
-                            fao_df = fao_df[fao_df['Counselor Name'] != fao_name]
+                            fao_df = fao_df[fao_df['Name'] != fao_name]
                         elif fao_score > gc_score or fao_score == gc_score:
-                            gc_df = gc_df[gc_df['Counselor Name'] != gc_name]
+                            gc_df = gc_df[gc_df['Name'] != gc_name]
                             break  # Only remove the GC if there's a strict resolution
         return fao_df, gc_df
 
     fao_df, gc_df = filter_incompatible_pairs(fao_df, gc_df)
 
+    # Display top 3 counselors after filtering
     def filter_and_sort_counselors(df, package_type):
         # Filter out entries with zero or negative spots available
         if "AC" in package_type and '# AC spots left after recommendations' in df.columns:
@@ -644,53 +670,146 @@ if st.session_state["authenticated"]:
 
 
 
-    # # Path to the Biocards folder
-    # biocards_folder = r'C:\InGenius Prep\Counselor app\Biocards'
+    # def increment_assigned_google_sheet(sheet_name, counselor_name, selected_package, student_name):
+    #     try:
+    #         # Open the worksheet
+    #         worksheet = sheet.worksheet(sheet_name)
+    #         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
+    #         # Get all records and headers
+    #         records = worksheet.get_all_records()
+    #         headers = worksheet.row_values(1)
+
+    #         # Find the row index for the counselor
+    #         row_index = None
+    #         for i, record in enumerate(records, start=2):  # start=2 because header is row 1
+    #             if record.get('Name') == counselor_name:
+    #                 row_index = i
+    #                 break
+            
+    #         if row_index is None:
+    #             raise ValueError(f"Counselor {counselor_name} not found in {sheet_name}")
+
+    #         # Determine package type and column names
+    #         package_prefix = 'AC' if selected_package.startswith('AC') else 'CB'
+    #         recommended_col_name = f'# {package_prefix} recommended'
+    #         spots_left_col_name = f'# {package_prefix} spots left after recommendations'
+    #         student_col_prefix = f'Recommended {package_prefix} Student'
+
+    #         # Find column indices
+    #         try:
+    #             recommended_col_idx = headers.index(recommended_col_name) + 1  # +1 for 1-based index
+    #             spots_left_col_idx = headers.index(spots_left_col_name) + 1
+    #         except ValueError:
+    #             st.error(f"Required columns not found in sheet. Available columns: {headers}")
+    #             return False
+
+    #         # Helper function to safely convert to float
+    #         def safe_float_convert(value):
+    #             try:
+    #                 return float(value) if value else 0.0
+    #             except (ValueError, TypeError):
+    #                 return 0.0
+
+    #         # Get current values with safe conversion
+    #         current_recommended = safe_float_convert(worksheet.cell(row_index, recommended_col_idx).value)
+    #         current_spots_left = safe_float_convert(worksheet.cell(row_index, spots_left_col_idx).value)
+
+    #         # Update values while maintaining float precision
+    #         worksheet.update_cell(row_index, recommended_col_idx, current_recommended + 1)
+    #         worksheet.update_cell(row_index, spots_left_col_idx, current_spots_left - 1)  # Can be negative
+
+    #         # Find or create student column
+    #         student_col_name = f'{student_col_prefix} {int(current_recommended) + 1}'
+    #         try:
+    #             student_col_idx = headers.index(student_col_name) + 1
+    #         except ValueError:
+    #             # Add new column if it doesn't exist
+    #             student_col_idx = len(headers) + 1
+    #             worksheet.update_cell(1, student_col_idx, student_col_name)
+    #             headers.append(student_col_name)  # Update headers list
+
+    #         # Add student info
+    #         worksheet.update_cell(row_index, student_col_idx, f'{student_name} - {now}')
+
+    #         return True
+
+    #     except Exception as e:
+    #         st.error(f"Error updating Google Sheet: {str(e)}")
+    #         import traceback
+    #         st.error(traceback.format_exc())  # Show full traceback for debugging
+    #         return False
+
+    # def display_and_select_counselors(df, state_key, counselor_type):
+    #     st.subheader(f"Top {counselor_type} Matches")
+    #     for index, row in df.iterrows():
+    #         selected = st.session_state.get(state_key) == row['Name']
+    #         counselor_card = f"""
+    #         <div class="profile-card" style="background-color: {'#ADD8E6' if selected else '#FFFFFF'};">
+    #             <h3>{row['Name']}</h3>
+    #             <p><strong>Personality Traits:</strong> {row[f'{counselor_type} Personality Traits']}</p>
+    #             <p><strong>Subjects:</strong> {row['Subjects']}</p>
+    #             <p><strong>Timezone:</strong> {row['Available Timezones']}</p>
+    #             <p><strong>Degree:</strong> {row['Degree Classification']}</p>
+    #         </div>
+    #         """
+    #         st.markdown(counselor_card, unsafe_allow_html=True)
+    #         button_key = f"{counselor_type.lower()}{index}"
+    #         if st.button(f"Select {row['Name']}", key=button_key):
+    #             st.session_state[state_key] = row['Name']
+    #             st.session_state[f'other_selected_{counselor_type}'] = [st.session_state.get(f'selected_{ct}', '') for ct in ['fao', 'gc'] if ct != counselor_type.lower()]
+    #             if row['Name'] in st.session_state[f'other_selected_{counselor_type}']:
+    #                 st.error("This counselor has already been selected in another section.")
+    #             else:
+    #                 st.rerun()
 
     # if st.button("Find Top Counselors"):
+    #     st.session_state['show_results'] = True
+    #     st.session_state['selection_sent'] = False
+
+    # if st.session_state.get('show_results'):
     #     st.header("Top Counselor Matches")
-    #     col1, col2 = st.columns(2)
+    #     cols = st.columns(2) if fao_package_available and gc_package_available else [st.container()]
 
-    #     # Function to embed a PDF in an iframe
-    #     def display_pdf(folder_path, counselor_name):
-    #         # Locate the PDF file by matching the name
-    #         pdf_files = [f for f in os.listdir(folder_path) if f.startswith(counselor_name) and f.endswith(".pdf")]
-    #         if pdf_files:
-    #             file_path = os.path.join(folder_path, pdf_files[0])
-    #             with open(file_path, "rb") as pdf_file:
-    #                 pdf_data = pdf_file.read()
-                
-    #             # Encode the PDF data to base64
-    #             import base64
-    #             pdf_base64 = base64.b64encode(pdf_data).decode('utf-8')
-                
-    #             # Create an iframe to display the PDF
-    #             pdf_display = f"""
-    #                 <iframe src="data:application/pdf;base64,{pdf_base64}" width="700" height="500" style="border: none;"></iframe>
-    #             """
-    #             st.markdown(pdf_display, unsafe_allow_html=True)
+    #     if fao_package_available:
+    #         with cols[0]:
+    #             display_and_select_counselors(fao_top_matches, 'selected_fao', 'FAO')
+
+    #     if gc_package_available:
+    #         with cols[1] if fao_package_available else cols[0]:
+    #             display_and_select_counselors(gc_top_matches, 'selected_gc', 'GC')
+
+    #     both_packages_required = fao_package_available and gc_package_available
+    #     fao_selected = st.session_state.get('selected_fao')
+    #     gc_selected = st.session_state.get('selected_gc')
+    #     send_button = False
+
+    #     if both_packages_required:
+    #         if fao_selected and gc_selected:
+    #             send_button = st.button("Send the selections")
+    #     else:
+    #         if fao_selected or gc_selected:
+    #             send_button = st.button("Send the selections")
+
+    #     if send_button and not st.session_state.get('selection_sent', False):
+    #         success = True
+    #         if fao_selected:
+    #             success &= increment_assigned_google_sheet('UG FAOs', st.session_state['selected_fao'], selected_fao_package, student_name)
+    #         if gc_selected:
+    #             success &= increment_assigned_google_sheet('US UG GCs', st.session_state['selected_gc'], selected_gc_package, student_name)
+            
+    #         if success:
+    #             st.success("Selections sent successfully!")
+    #             st.session_state['selection_sent'] = True
+    #             st.session_state['show_results'] = False
     #         else:
-    #             st.warning(f"PDF for {counselor_name} not found!")
+    #             st.error("Failed to update one or more selections.")
+    #     elif send_button:
+    #         st.error("Selections already sent, please start new or make new selections.")
 
-    #     # FAO Section
-    #     with col1:
-    #         st.subheader("Top FAO Matches")
-    #         for _, row in fao_top_matches.iterrows():
-    #             counselor_name = row['Counselor Name']
-    #             fao_folder = os.path.join(biocards_folder, 'FAO Biocards')
-    #             st.markdown(f"**{counselor_name}**")
-    #             display_pdf(fao_folder, counselor_name)
-
-    #     # GC Section
-    #     with col2:
-    #         st.subheader("Top GC Matches")
-    #         for _, row in gc_top_matches.iterrows():
-    #             counselor_name = row['Counselor Name']
-    #             gc_folder = os.path.join(biocards_folder, 'GC Biocards')
-    #             st.markdown(f"**{counselor_name}**")
-    #             display_pdf(gc_folder, counselor_name)
-
+    # if st.button("Start new"):
+    #     st.session_state.clear()
+    #     st.rerun()
 
 
     if st.button("Find Top Counselors"):
@@ -709,7 +828,7 @@ if st.session_state["authenticated"]:
                 for _, row in fao_top_matches.iterrows():
                     st.markdown(f"""
                     <div class="profile-card">
-                        <h3>{row['Counselor Name']}</h3>
+                        <h3>{row['Name']}</h3>
                         <p><strong>Personality Traits:</strong> {row['FAO Personality Traits']}</p>
                         <p><strong>Subjects:</strong> {row['Subjects']}</p>
                         <p><strong>Timezone:</strong> {row['Available Timezones']}</p>
@@ -727,7 +846,7 @@ if st.session_state["authenticated"]:
                 for _, row in gc_top_matches.iterrows():
                     st.markdown(f"""
                     <div class="profile-card">
-                        <h3>{row['Counselor Name']}</h3>
+                        <h3>{row['Name']}</h3>
                         <p><strong>Personality Traits:</strong> {row['GC Personality Traits']}</p>
                         <p><strong>Subjects:</strong> {row['Subjects']}</p>
                         <p><strong>Timezone:</strong> {row['Available Timezones']}</p>
@@ -742,9 +861,5 @@ if st.session_state["authenticated"]:
     if st.button("Start new"):
         st.session_state['reset'] = True  # Set the flag to reset all states
         st.rerun()
-
-
-
-
 
 

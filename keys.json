@@ -1,0 +1,13 @@
+{
+  "type": "service_account",
+  "project_id": "counselorapp-453116",
+  "private_key_id": "4ac64d987aeaa073893c3f1e4c64ae62bf3c3e89",
+  "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvAIBADANBgkqhkiG9w0BAQEFAASCBKYwggSiAgEAAoIBAQDlCFVhsA0RI1cA\nUVXE/dWsWrhW/ahUZ74ZNHYSTKkCQ3Ps55Aq9tXkVT8nzxLje1GfKxNXGa73dB7Q\nlhUf23AOysCvggYeKHMV6KAC+Kc7uOlBkQzN3Ekb4GJaHksc6wEQv5YoH3sZkNWN\nECyg6FzklOFfiHuQk1NQt8iDgLYtuGP0bAIUfJYywzqJ7Wwm1N01UpToLHyW2bOE\nTV1tenF6rfj2GQAhXTSVYf3d15OEM4J1AiMiJVfQaHFIGRjyAoTrRKJBh+MJuDYQ\niXfQABaZ5hcN0U8i9QIEVtkRLNqG58f5b1BlJr9057OLEMSi/YsmVirhSGyLPVPT\nDlejSxiRAgMBAAECggEABUqan2PH/4D9o/UdGkyjhMSBTQg1/QI7FP2+axiQkIvy\nqBLnBKkYgrqZ949cEDujhH4EJ79hCJhLFHZdNVPWbE8QodVrEwQL+aH63Wq1gWaZ\npAFIBpML8NwPpaWcxmWjDAojG9jzWQE8v9Izd8G6kLDkXpbKhQn0UzF1zVz6SIbW\nfsSpEWJiAVfj9h8lsjn7OfwpN7GMTPYqlIMBj/oNULn23x35j60K3we6oBSZJsa6\nbgTnqZpJWtsEO43SYSfNALlZ9cDp0/dzQCRm+b+gp1m8JcrMkSROXme3IFlHjySF\nhDEWFuQ3zWsE90VWQrM53XZCCKHLJDj+8TE0EfnCKQKBgQD1fAp34bceT90o9Qdt\nAv19lTiMaNALikNRDk+Y8UNakvcHFWB8uJQ6LECN0Nh9rcjFJQJVgD38aU2tS/wz\nXTVQsPk9x9+6/uRwiSD/xYRg/lA1HRQZGodiCU4ojOWChHMGsVm1WpolUNars7Nw\nApZXZtopbFXDeFaD6XwoxL2iOQKBgQDu1+G/R7lK389BaBNGqKP2MST3uGZll73L\nBkgl1TFFOgyFstfN4d3/s/4YkNY27xndq2l3G3SwfJPfFpXBCzqcWjCQJGFST2HX\nj+DUf820uUxLDtJ++jntuBvEuz5rZyW/yYkvF0Mres+OFGQ8drqAqo/PLP5daQWZ\nHx811aRJGQKBgDCcua33wr177z3XF/tcZjpiPGqBrwE6Bg6dGOIelMnw5H5Am3TX\nUHMcpEPxIY3xxhpUM9weoyfC6qDwtSauxIoQIas8U2/CXhZy8Vf1Ezvp4JREB+DY\nwgqF8TZSgHiSJf0jTbJ+GJxfH8OsuFHsET2JnpYpX+pvgCJrMC0amLrxAoGAf4og\nLjhqpaTl05Nz16NuCqUrjGyXoWBqJOPx2uIBMWpSDYL24iXemhDPeua8vRDoywoh\ng0zR/vxHKjWxOih438z5ab9DiOSC5s0Zzd+BRSQ9rUb4+H0+Oca6bU9fgZLPAZ7o\n9pCBedJWyxPwgqkT5mkt6f+oxNC0AJQx4ll3JOECgYAi6TtOlM4OkhtUxEjyVdJP\nQFIxr0Co2WoWwNOrdD6AFmUohMnfoa1z78XmHTxP0uekjJo37Rs1a94wm0bd/2Hq\nZ8mFnY/PR1SqpMVaIBOdCDgB2n2hl0lYJjy7esKbpnkmC6Co8Cl9/+k05Cgyxu2Z\ntCTomLyWreT9gacVZ5orwA==\n-----END PRIVATE KEY-----\n",
+  "client_email": "counselorapp@counselorapp-453116.iam.gserviceaccount.com",
+  "client_id": "109111499875976006623",
+  "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+  "token_uri": "https://oauth2.googleapis.com/token",
+  "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+  "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/counselorapp%40counselorapp-453116.iam.gserviceaccount.com",
+  "universe_domain": "googleapis.com"
+}
