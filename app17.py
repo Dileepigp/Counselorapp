@@ -80,7 +80,7 @@ if st.session_state["authenticated"]:
     client = gspread.authorize(creds)
 
     # Open spreadsheet and load worksheets
-    spreadsheet = client.open_by_key('19a7DqNpQHUdm4rV_1Em-IdfKMgnhwcARx9QhQUqlhNw')
+    spreadsheet = client.open_by_key('19Ss02r7J93caq2aFxwv4F87OzeX0iIBpgf5v6v9dHTA')
     fao_worksheet = spreadsheet.worksheet("UG FAOs")
     gc_worksheet = spreadsheet.worksheet("US UG GCs")
 
