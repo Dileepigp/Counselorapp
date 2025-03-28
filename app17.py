@@ -16,7 +16,7 @@ st.set_page_config(
 
 # Authentication credentials
 USERNAME = "counselorapp"
-PASSWORD = "igp123"
+PASSWORD = "igpcsapp@#*25"
 
 # Authentication function
 def authenticate(username, password):
@@ -80,7 +80,7 @@ if st.session_state["authenticated"]:
     client = gspread.authorize(creds)
 
     # Open spreadsheet and load worksheets
-    spreadsheet = client.open_by_key('19a7DqNpQHUdm4rV_1Em-IdfKMgnhwcARx9QhQUqlhNw')
+    spreadsheet = client.open_by_key('19Ss02r7J93caq2aFxwv4F87OzeX0iIBpgf5v6v9dHTA')
     fao_worksheet = spreadsheet.worksheet("UG FAOs")
     gc_worksheet = spreadsheet.worksheet("US UG GCs")
 
@@ -271,14 +271,18 @@ if st.session_state["authenticated"]:
         </div>
     """, unsafe_allow_html=True)
 
-    # Reset logic at the top of your script
+    keys_to_reset = [
+        'student_name', 'show_results', 'selected_fao', 'selected_gc',
+        'selection_sent', 'reset', 'personality_traits', 'degree_selection',
+        'subjects', 'timezones', 'packages', 'additional_filters'
+    ]
+
+    # Check if a reset is needed at the start of your script
     if st.session_state.get('reset', False):
-        # Clear ALL session state except authentication
-        auth_state = st.session_state.get('authenticated', False)
-        st.session_state.clear()
-        st.session_state['authenticated'] = auth_state
-        st.session_state['reset'] = False
-        st.rerun()
+        for key in keys_to_reset:
+            if key in st.session_state:
+                del st.session_state[key]
+        st.session_state['reset'] = False  # Clear the reset flag
 
     # Input for student name
     student_name = st.text_input("Enter Student Name:", key="student_name", value="")
@@ -465,6 +469,17 @@ if st.session_state["authenticated"]:
         rank = st.selectbox(label, available_ranks, key=key)
         return rank
 
+    def extract_unique_credentials(df):
+        credentials = set()
+        for cred in df['Credentials'].dropna().unique():
+            if isinstance(cred, str):  # Ensure it's a string
+                credentials.update([c.strip() for c in cred.split(',')])
+        return sorted([c for c in credentials if c])  # Filter out empty strings
+
+    # Get unique credentials for each counselor type
+    fao_credentials = extract_unique_credentials(fao_df)
+    gc_credentials = extract_unique_credentials(gc_df)
+
     # Split Screen: FAO on the left, GC on the right
     col1, col2 = st.columns([1, 1])
 
@@ -475,7 +490,7 @@ if st.session_state["authenticated"]:
     if "show_gc_priority" not in st.session_state:
         st.session_state["show_gc_priority"] = False
 
-    # FAO Section
+        # FAO Section
     if fao_package_available:
         with col1:
             with st.expander("FAO Counselors Section", expanded=True):
@@ -483,7 +498,8 @@ if st.session_state["authenticated"]:
                 fao_preferences = {
                     'FAO Personality Traits': st.multiselect("Select preferred personality traits (FAO)", fao_traits_options, key="fao_traits"),
                     'Subjects': st.multiselect("Select subjects of interest (FAO)", subjects_options, key="fao_subjects"),
-                    'Degree Classification': st.multiselect("Preferred degree classification (FAO)", degree_classification_options, key="fao_degree")
+                    'Degree Classification': st.multiselect("Preferred degree classification (FAO)", degree_classification_options, key="fao_degree"),
+                    'Credentials': st.multiselect("Preferred Credentials (Graduated College - FAO)", fao_credentials, key="fao_credentials")
                 }
                 fao_experience_level = st.selectbox("Years of Experience (FAO)", ["Choose...", "1+", "2+", "3+", "4+", "5+"], key="fao_experience")
                 fao_Admission_experience = st.multiselect(
@@ -500,7 +516,7 @@ if st.session_state["authenticated"]:
             if st.session_state["show_fao_priority"]:
                 st.subheader("Rank Preferences for FAO")
                 fao_points = {}
-                # Count non-empty categories, including Years of Experience and Admission Results if selected
+                # Count non-empty categories
                 num_categories = len([opts for opts in fao_preferences.values() if opts])
                 if fao_experience_level != "Choose...":
                     num_categories += 1
@@ -509,12 +525,17 @@ if st.session_state["authenticated"]:
 
                 available_ranks = list(range(1, num_categories + 1))
 
+                # Process all preferences including the new Graduated College
                 for category, options in fao_preferences.items():
                     if options:
                         category_rank = rank_input(f"Rank for {category} (FAO)", available_ranks, key=f"fao_rank_{category}")
                         available_ranks.remove(category_rank)
                         for option in options:
-                            clean_option = option.split(" ", 1)[1]
+                            # Handle Graduated College differently (no emoji to remove)
+                            if category == 'Credentials':
+                                clean_option = option
+                            else:
+                                clean_option = option.split(" ", 1)[1] if " " in option else option
                             fao_points[f"{category}: {clean_option}"] = 10 * (num_categories + 1 - category_rank)
 
                 if fao_experience_level != "Choose...":
@@ -529,7 +550,7 @@ if st.session_state["authenticated"]:
                         fao_points[f"Admission Results: {exp}"] = 10 * (num_categories + 1 - category_rank)
 
                 st.session_state['fao_points'] = fao_points
-    
+
     if gc_package_available:
         # GC Section
         with col2:
@@ -538,7 +559,8 @@ if st.session_state["authenticated"]:
                 gc_preferences = {
                     'GC Personality Traits': st.multiselect("Select preferred personality traits (GC)", fao_traits_options, key="gc_traits"),
                     'Subjects': st.multiselect("Select subjects of interest (GC)", subjects_options, key="gc_subjects"),
-                    'Degree Classification': st.multiselect("Preferred degree classification (GC)", degree_classification_options, key="gc_degree")
+                    'Degree Classification': st.multiselect("Preferred degree classification (GC)", degree_classification_options, key="gc_degree"),
+                    'Credentials': st.multiselect("Preferred Credentials (Graduated College - GC)", gc_credentials, key="gc_credentials")
                 }
                 gc_experience_level = st.selectbox("Years of Experience (GC)", ["Choose...", "1+", "2+", "3+", "4+", "5+"], key="gc_experience")
                 gc_Admission_experience = st.multiselect(
@@ -555,7 +577,7 @@ if st.session_state["authenticated"]:
             if st.session_state["show_gc_priority"]:
                 st.subheader("Rank Preferences for GC")
                 gc_points = {}
-                # Count non-empty categories, including Years of Experience and Admission Results if selected
+                # Count non-empty categories
                 num_categories = len([opts for opts in gc_preferences.values() if opts])
                 if gc_experience_level != "Choose...":
                     num_categories += 1
@@ -564,12 +586,17 @@ if st.session_state["authenticated"]:
 
                 available_ranks = list(range(1, num_categories + 1))
 
+                # Process all preferences including the new Graduated College
                 for category, options in gc_preferences.items():
                     if options:
                         category_rank = rank_input(f"Rank for {category} (GC)", available_ranks, key=f"gc_rank_{category}")
                         available_ranks.remove(category_rank)
                         for option in options:
-                            clean_option = option.split(" ", 1)[1]
+                            # Handle Graduated College differently (no emoji to remove)
+                            if category == 'Credentials':
+                                clean_option = option
+                            else:
+                                clean_option = option.split(" ", 1)[1] if " " in option else option
                             gc_points[f"{category}: {clean_option}"] = 10 * (num_categories + 1 - category_rank)
 
                 if gc_experience_level != "Choose...":
