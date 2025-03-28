@@ -1,3 +1,6 @@
 streamlit
 pandas
-openpyxl  # Required for reading Excel files in Pandas
+openpyxl
+gspread
+oauth2client
+google-auth

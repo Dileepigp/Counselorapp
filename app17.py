@@ -16,7 +16,7 @@ st.set_page_config(
 
 # Authentication credentials
 USERNAME = "counselorapp"
-PASSWORD = "igpcsapp@#*25"
+PASSWORD = "igp123"
 
 # Authentication function
 def authenticate(username, password):
@@ -80,7 +80,7 @@ if st.session_state["authenticated"]:
     client = gspread.authorize(creds)
 
     # Open spreadsheet and load worksheets
-    spreadsheet = client.open_by_key('19Ss02r7J93caq2aFxwv4F87OzeX0iIBpgf5v6v9dHTA')
+    spreadsheet = client.open_by_key('19a7DqNpQHUdm4rV_1Em-IdfKMgnhwcARx9QhQUqlhNw')
     fao_worksheet = spreadsheet.worksheet("UG FAOs")
     gc_worksheet = spreadsheet.worksheet("US UG GCs")
 
@@ -500,7 +500,7 @@ if st.session_state["authenticated"]:
             if st.session_state["show_fao_priority"]:
                 st.subheader("Rank Preferences for FAO")
                 fao_points = {}
-                # Count non-empty categories, including Years of Experience and Admission Experience if selected
+                # Count non-empty categories, including Years of Experience and Admission Results if selected
                 num_categories = len([opts for opts in fao_preferences.values() if opts])
                 if fao_experience_level != "Choose...":
                     num_categories += 1
@@ -523,10 +523,10 @@ if st.session_state["authenticated"]:
                     fao_points[f"Experience: {fao_experience_level}"] = 10 * (num_categories + 1 - category_rank)
 
                 if fao_Admission_experience:
-                    category_rank = rank_input(f"Rank for Admission Experience (FAO)", available_ranks, key="fao_Admission_rank")
+                    category_rank = rank_input(f"Rank for Admission Results (FAO)", available_ranks, key="fao_Admission_rank")
                     available_ranks.remove(category_rank)
                     for exp in fao_Admission_experience:
-                        fao_points[f"Admission Experience: {exp}"] = 10 * (num_categories + 1 - category_rank)
+                        fao_points[f"Admission Results: {exp}"] = 10 * (num_categories + 1 - category_rank)
 
                 st.session_state['fao_points'] = fao_points
     
@@ -555,7 +555,7 @@ if st.session_state["authenticated"]:
             if st.session_state["show_gc_priority"]:
                 st.subheader("Rank Preferences for GC")
                 gc_points = {}
-                # Count non-empty categories, including Years of Experience and Admission Experience if selected
+                # Count non-empty categories, including Years of Experience and Admission Results if selected
                 num_categories = len([opts for opts in gc_preferences.values() if opts])
                 if gc_experience_level != "Choose...":
                     num_categories += 1
@@ -578,10 +578,10 @@ if st.session_state["authenticated"]:
                     gc_points[f"Experience: {gc_experience_level}"] = 10 * (num_categories + 1 - category_rank)
 
                 if gc_Admission_experience:
-                    category_rank = rank_input(f"Rank for Admission Experience (GC)", available_ranks, key="gc_Admission_rank")
+                    category_rank = rank_input(f"Rank for Admission Results (GC)", available_ranks, key="gc_Admission_rank")
                     available_ranks.remove(category_rank)
                     for exp in gc_Admission_experience:
-                        gc_points[f"Admission Experience: {exp}"] = 10 * (num_categories + 1 - category_rank)
+                        gc_points[f"Admission Results: {exp}"] = 10 * (num_categories + 1 - category_rank)
 
                 st.session_state['gc_points'] = gc_points
 
@@ -597,9 +597,9 @@ if st.session_state["authenticated"]:
                         if int(row['Experience']) >= exp_level:
                             score += weight
                     
-                    # Admission Experience Points
-                    elif option.startswith("Admission Experience"):
-                        Admission_experiences = row.get('Admission Experience', "")
+                    # Admission Results Points
+                    elif option.startswith("Admission Results"):
+                        Admission_experiences = row.get('Admission Results', "")
                         if isinstance(Admission_experiences, str):
                             Admission_experiences = Admission_experiences.split(", ")
                         if option.split(": ")[1] in Admission_experiences:
