@@ -16,7 +16,7 @@ st.set_page_config(
 
 # Authentication credentials
 USERNAME = "counselorapp"
-PASSWORD = "igpcsapp@#*25"
+PASSWORD = "igp123"
 
 # Authentication function
 def authenticate(username, password):
@@ -50,11 +50,19 @@ if st.session_state["authenticated"]:
             del st.session_state[key]
         st.experimental_set_query_params()  # Reset the app state
 
-    # Your existing app code starts here
-    # st.title("InGenius Prep - Counselor Matchmaking")
-
-    # Initialize Google Sheets Client
-    scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+    # Initialize Google Sheets Client only once
+    if 'client' not in st.session_state:
+        scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+        creds = Credentials.from_service_account_file('keys.json', scopes=scope)
+        st.session_state['client'] = gspread.authorize(creds)
+        st.session_state['spreadsheet'] = st.session_state['client'].open_by_key('19Ss02r7J93caq2aFxwv4F87OzeX0iIBpgf5v6v9dHTA')
+        st.session_state['fao_worksheet'] = st.session_state['spreadsheet'].worksheet("UG FAOs")
+        st.session_state['gc_worksheet'] = st.session_state['spreadsheet'].worksheet("US UG GCs")
+        
+        # Load data only once
+        st.session_state['fao_df'] = pd.DataFrame(st.session_state['fao_worksheet'].get_all_records())
+        st.session_state['gc_df'] = pd.DataFrame(st.session_state['gc_worksheet'].get_all_records())
+        st.session_state['college_rankings_df'] = pd.read_csv('Colleges Rankings.csv')
 
     # Function to clean comma-separated values in counselor data
     def clean_counselor_data(df):
@@ -75,26 +83,16 @@ if st.session_state["authenticated"]:
             df['COLLEGE'] = df['COLLEGE'].str.strip()
         return df
 
-    # Load credentials and authorize
-    creds = Credentials.from_service_account_file('keys.json', scopes=scope)
-    client = gspread.authorize(creds)
-
-    # Open spreadsheet and load worksheets
-    spreadsheet = client.open_by_key('19Ss02r7J93caq2aFxwv4F87OzeX0iIBpgf5v6v9dHTA')
-    fao_worksheet = spreadsheet.worksheet("UG FAOs")
-    gc_worksheet = spreadsheet.worksheet("US UG GCs")
-
-    # Load and clean counselor data
-    fao_df = clean_counselor_data(pd.DataFrame(fao_worksheet.get_all_records()))
-    gc_df = clean_counselor_data(pd.DataFrame(gc_worksheet.get_all_records()))
+    # Clean the data
+    fao_df = clean_counselor_data(st.session_state['fao_df'])
+    gc_df = clean_counselor_data(st.session_state['gc_df'])
+    college_rankings_df = clean_college_rankings(st.session_state['college_rankings_df'])
 
     # Standard cleaning for both DataFrames
     for df in [fao_df, gc_df]:
         df.fillna("", inplace=True)
         df.columns = df.columns.str.strip()
 
-    # Load and clean college rankings
-    college_rankings_df = clean_college_rankings(pd.read_csv('Colleges Rankings.csv'))
     Admission_experience_options = college_rankings_df['COLLEGE'].tolist()
 
     incompatible_counselors = {
@@ -104,7 +102,7 @@ if st.session_state["authenticated"]:
         'Robert Thomas': ['Roscoe Nicholson'],
         'Amy Greene': ['Zakaree Harris']
     }
-    # Add professional icons for a more refined experience
+
     fao_traits_options = [
         '🧠 Bubbly',
         '🎨 Creative',
@@ -124,6 +122,7 @@ if st.session_state["authenticated"]:
         '🧠 Talkative/Chatty',
         '🔥 Warm'
     ]
+    
     subjects_options = [
         '📐 Applied Math',
         '🏛️ Architecture',
@@ -160,19 +159,6 @@ if st.session_state["authenticated"]:
         '🌎 Social Sciences',
         '📈 Statistics'
     ]
-    timezones_options = [
-        '🌏 Asia',
-        '🌏 Australia/NZ',
-        '🌍 CST',
-        '🌎 EST',
-        '🌍 Europe',
-        '🌍 MST',
-        '🌍 PST'
-    ]
-    degree_classification_options = ['🎓 PhD Degree', '🎓 Masters Degree', '🎓 Undergraduate Degree']
-
-    # # Set up Streamlit page configuration
-    # st.set_page_config(page_title="InGenius Prep - Counselor Matchmaking", page_icon="🔍", layout="wide")
 
     # Styling and CSS
     st.markdown("""
@@ -273,8 +259,8 @@ if st.session_state["authenticated"]:
 
     keys_to_reset = [
         'student_name', 'show_results', 'selected_fao', 'selected_gc',
-        'selection_sent', 'reset', 'personality_traits', 'degree_selection',
-        'subjects', 'timezones', 'packages', 'additional_filters'
+        'selection_sent', 'reset', 'personality_traits', 'subjects',
+        'timezones', 'packages', 'additional_filters'
     ]
 
     # Check if a reset is needed at the start of your script
@@ -290,82 +276,30 @@ if st.session_state["authenticated"]:
         st.warning("Please enter the student name before proceeding.")
         st.stop()
 
-    # Step 1: Select Timezone
-    # st.markdown("""
-    #     <p style="font-size: 1.5em; 
-    #             font-weight: bold; 
-    #             color: #005CAA; 
-    #             margin-bottom: 5px;"> 
-    #         Select the timezone of the student
-    #     </p>
-    # """, unsafe_allow_html=True)
-    # Function to extract unique timezones from a given dataframe
-    def extract_unique_timezones(df):
-        # Collecting all unique timezone entries
-        timezones = set()
-        for tz in df['Available Timezones'].dropna().unique():
-            # Splitting and stripping if multiple timezones are listed in a single cell
-            timezones.update([t.strip() for t in tz.split(',')])
-        return timezones
+    # Function to extract unique values from a column
+    def extract_unique_values(df, column_name):
+        values = set()
+        for val in df[column_name].dropna().unique():
+            if isinstance(val, str):
+                values.update([v.strip() for v in val.split(',')])
+        return sorted(values)
 
-    # Extract unique timezones from both FAO and GC dataframes
-    fao_timezones = extract_unique_timezones(fao_df)
-    gc_timezones = extract_unique_timezones(gc_df)
+    # Timezone selection
+    fao_timezones = extract_unique_values(fao_df, 'Available Timezones')
+    gc_timezones = extract_unique_values(gc_df, 'Available Timezones')
+    combined_timezones = sorted(set(fao_timezones).union(set(gc_timezones)))
+    selected_timezone = st.selectbox("Select Timezone", combined_timezones)
 
-    # Combine and sort the list of unique timezones from both FAO and GC
-    combined_timezones = sorted(fao_timezones.union(gc_timezones))
+    # Student type selection
+    fao_student_types = extract_unique_values(fao_df, 'Domestic/International')
+    gc_student_types = extract_unique_values(gc_df, 'Domestic/International')
+    combined_student_types = sorted(set(fao_student_types).union(set(gc_student_types)))
+    selected_student_type = st.selectbox("Select Student Type", combined_student_types)
 
-    # User interface for selecting a common timezone
-    st.markdown("### Timezone Selection for FAO and GC")
-    selected_timezone = st.selectbox("Select a Timezone", combined_timezones)
-
-    # Apply the selected timezone filter to both FAO and GC dataframes and check if they are empty after filtering
-    fao_df_filtered = fao_df[fao_df['Available Timezones'].apply(lambda x: selected_timezone in [tz.strip() for tz in x.split(',')])]
-    gc_df_filtered = gc_df[gc_df['Available Timezones'].apply(lambda x: selected_timezone in [tz.strip() for tz in x.split(',')])]
-
-    if fao_df_filtered.empty or gc_df_filtered.empty:
-        st.warning("No matching entries for the selected timezone in one or both databases.")
-        # Optionally, you can reset to the original dataframes or handle the situation differently here.
-    else:
-        # Continue processing with non-empty dataframes
-        fao_df = fao_df_filtered
-        gc_df = gc_df_filtered
-    # Proceed with the rest of your app's logic where you use fao_df and gc_df
-
-
-    def extract_unique_student_types(df):
-        # Collect all unique student type entries
-        student_types = set()
-        for types in df['Domestic/International'].dropna().unique():
-            # Splitting and stripping if multiple types are listed in a single cell
-            student_types.update([t.strip() for t in types.split(',')])
-        return list(student_types)
-
-    # Extract unique student types from both dataframes
-    combined_student_types = list(set(extract_unique_student_types(fao_df) + extract_unique_student_types(gc_df)))
-
-    # User interface for selecting student type
-    st.markdown("### Select Student Type for FAO and GC")
-    selected_student_type = st.selectbox("Student Types", combined_student_types)
-
-    # Filtering both FAO and GC dataframes based on selected student type
-    fao_df = fao_df[fao_df['Domestic/International'].apply(lambda x: selected_student_type in [t.strip() for t in x.split(',')])]
-    gc_df = gc_df[gc_df['Domestic/International'].apply(lambda x: selected_student_type in [t.strip() for t in x.split(',')])]
-
-
-
-    # Function to extract unique packages from a dataframe column
-    def extract_unique_packages(df, column_name):
-        all_packages = set()
-        for packages in df[column_name].dropna().unique():
-            all_packages.update([pkg.strip() for pkg in packages.split(",")])
-        return sorted(list(all_packages))
-
-    # Function to get the linked package based on the current selection
+    # Package selection
     def get_linked_package(selected_package, package_mapping):
         return package_mapping.get(selected_package, None)
 
-    # Handler for changes in the FAO package selection
     def on_fao_package_change():
         fao_package = st.session_state['fao_package']
         gc_package = get_linked_package(fao_package, package_links)
@@ -376,7 +310,6 @@ if st.session_state["authenticated"]:
             st.session_state['gc_package'] = gc_package
             st.session_state['disable_gc'] = False
 
-    # Handler for changes in the GC package selection
     def on_gc_package_change():
         gc_package = st.session_state['gc_package']
         fao_package = get_linked_package(gc_package, reverse_package_links)
@@ -387,7 +320,6 @@ if st.session_state["authenticated"]:
             st.session_state['fao_package'] = fao_package
             st.session_state['disable_fao'] = False
 
-    # Define mappings between FAO and GC packages
     package_links = {
         'CB FAO Biweekly Meeting (Diamond)': None,
         'CB FAO Bimonthly Meeting (Gold/Platinum)': 'CB GC Biweekly Meeting (Platinum/Gold/Silver)',
@@ -399,7 +331,7 @@ if st.session_state["authenticated"]:
     }
     reverse_package_links = {v: k for k, v in package_links.items() if v}
 
-    # Initialize session states
+    # Initialize session states for packages
     if 'fao_package' not in st.session_state:
         st.session_state['fao_package'] = None
     if 'gc_package' not in st.session_state:
@@ -409,11 +341,9 @@ if st.session_state["authenticated"]:
     if 'disable_gc' not in st.session_state:
         st.session_state['disable_gc'] = False
 
-    # Assume fao_df and gc_df are pre-defined DataFrames with the necessary columns
-    fao_packages = extract_unique_packages(fao_df, 'Available Packages')
-    gc_packages = extract_unique_packages(gc_df, 'Available Packages')
+    fao_packages = extract_unique_values(fao_df, 'Available Packages')
+    gc_packages = extract_unique_values(gc_df, 'Available Packages')
 
-    # UI for selecting packages
     st.markdown("### Package Selection for FAO and GC")
     col1, col2 = st.columns(2)
 
@@ -439,23 +369,10 @@ if st.session_state["authenticated"]:
             disabled=st.session_state['disable_gc']
         )
 
-    # Filter data based on the selected packages
-    if selected_fao_package and not st.session_state['disable_fao']:
-        fao_df = fao_df[fao_df['Available Packages'].apply(lambda x: selected_fao_package in [pkg.strip() for pkg in x.split(',')])]
-    if selected_gc_package and not st.session_state['disable_gc']:
-        gc_df = gc_df[gc_df['Available Packages'].apply(lambda x: selected_gc_package in [pkg.strip() for pkg in x.split(',')])]
-
     fao_package_available = selected_fao_package and not st.session_state['disable_fao']
     gc_package_available = selected_gc_package and not st.session_state['disable_gc']
-    # # Display filtered dataframes (if needed)
-    # st.markdown("### Filtered FAO Data")
-    # st.dataframe(fao_df)
 
-    # st.markdown("### Filtered GC Data")
-    # st.dataframe(gc_df)
-
-
-    # Helper function to create rank input
+    # Counselor preferences section
     def rank_input(label, available_ranks, key=None):
         """Render a rank input with restricted options."""
         st.markdown(f"**{label}**")
@@ -469,16 +386,9 @@ if st.session_state["authenticated"]:
         rank = st.selectbox(label, available_ranks, key=key)
         return rank
 
-    def extract_unique_credentials(df):
-        credentials = set()
-        for cred in df['Credentials'].dropna().unique():
-            if isinstance(cred, str):  # Ensure it's a string
-                credentials.update([c.strip() for c in cred.split(',')])
-        return sorted([c for c in credentials if c])  # Filter out empty strings
-
-    # Get unique credentials for each counselor type
-    fao_credentials = extract_unique_credentials(fao_df)
-    gc_credentials = extract_unique_credentials(gc_df)
+    # Extract unique credentials for each counselor type
+    fao_credentials = college_rankings_df['COLLEGE'].tolist()
+    gc_credentials = college_rankings_df['COLLEGE'].tolist()
 
     # Split Screen: FAO on the left, GC on the right
     col1, col2 = st.columns([1, 1])
@@ -486,11 +396,10 @@ if st.session_state["authenticated"]:
     # Initialize session state for FAO and GC priority sections
     if "show_fao_priority" not in st.session_state:
         st.session_state["show_fao_priority"] = False
-
     if "show_gc_priority" not in st.session_state:
         st.session_state["show_gc_priority"] = False
 
-        # FAO Section
+    # FAO Section
     if fao_package_available:
         with col1:
             with st.expander("FAO Counselors Section", expanded=True):
@@ -498,50 +407,33 @@ if st.session_state["authenticated"]:
                 fao_preferences = {
                     'FAO Personality Traits': st.multiselect("Select preferred personality traits (FAO)", fao_traits_options, key="fao_traits"),
                     'Subjects': st.multiselect("Select subjects of interest (FAO)", subjects_options, key="fao_subjects"),
-                    'Degree Classification': st.multiselect("Preferred degree classification (FAO)", degree_classification_options, key="fao_degree"),
                     'Credentials': st.multiselect("Preferred Credentials (Graduated College - FAO)", fao_credentials, key="fao_credentials")
                 }
-                fao_experience_level = st.selectbox("Years of Experience (FAO)", ["Choose...", "1+", "2+", "3+", "4+", "5+"], key="fao_experience")
                 fao_Admission_experience = st.multiselect(
                     "Preferred Admission Results (FAO)", 
                     Admission_experience_options, 
                     key="fao_Admission"
                 )
 
-                # Button to show the assign priority section
                 if st.button("Rank Preferences for FAO"):
                     st.session_state["show_fao_priority"] = True
 
-            # Display FAO priority section in the same column
             if st.session_state["show_fao_priority"]:
                 st.subheader("Rank Preferences for FAO")
                 fao_points = {}
-                # Count non-empty categories
                 num_categories = len([opts for opts in fao_preferences.values() if opts])
-                if fao_experience_level != "Choose...":
-                    num_categories += 1
                 if fao_Admission_experience:
                     num_categories += 1
 
                 available_ranks = list(range(1, num_categories + 1))
 
-                # Process all preferences including the new Graduated College
                 for category, options in fao_preferences.items():
                     if options:
                         category_rank = rank_input(f"Rank for {category} (FAO)", available_ranks, key=f"fao_rank_{category}")
                         available_ranks.remove(category_rank)
                         for option in options:
-                            # Handle Graduated College differently (no emoji to remove)
-                            if category == 'Credentials':
-                                clean_option = option
-                            else:
-                                clean_option = option.split(" ", 1)[1] if " " in option else option
+                            clean_option = option.split(" ", 1)[1] if " " in option else option
                             fao_points[f"{category}: {clean_option}"] = 10 * (num_categories + 1 - category_rank)
-
-                if fao_experience_level != "Choose...":
-                    category_rank = rank_input(f"Rank for Years of Experience (FAO)", available_ranks, key="fao_experience_rank")
-                    available_ranks.remove(category_rank)
-                    fao_points[f"Experience: {fao_experience_level}"] = 10 * (num_categories + 1 - category_rank)
 
                 if fao_Admission_experience:
                     category_rank = rank_input(f"Rank for Admission Results (FAO)", available_ranks, key="fao_Admission_rank")
@@ -551,58 +443,41 @@ if st.session_state["authenticated"]:
 
                 st.session_state['fao_points'] = fao_points
 
+    # GC Section
     if gc_package_available:
-        # GC Section
         with col2:
             with st.expander("GC Counselors Section", expanded=True):
                 st.subheader("Preferences for GC Counselors")
                 gc_preferences = {
                     'GC Personality Traits': st.multiselect("Select preferred personality traits (GC)", fao_traits_options, key="gc_traits"),
                     'Subjects': st.multiselect("Select subjects of interest (GC)", subjects_options, key="gc_subjects"),
-                    'Degree Classification': st.multiselect("Preferred degree classification (GC)", degree_classification_options, key="gc_degree"),
                     'Credentials': st.multiselect("Preferred Credentials (Graduated College - GC)", gc_credentials, key="gc_credentials")
                 }
-                gc_experience_level = st.selectbox("Years of Experience (GC)", ["Choose...", "1+", "2+", "3+", "4+", "5+"], key="gc_experience")
                 gc_Admission_experience = st.multiselect(
                     "Preferred Admission Results (GC)", 
                     Admission_experience_options, 
                     key="gc_Admission"
                 )
 
-                # Button to show the assign priority section
                 if st.button("Rank Preferences for GC"):
                     st.session_state["show_gc_priority"] = True
 
-            # Display GC priority section in the same column
             if st.session_state["show_gc_priority"]:
                 st.subheader("Rank Preferences for GC")
                 gc_points = {}
-                # Count non-empty categories
                 num_categories = len([opts for opts in gc_preferences.values() if opts])
-                if gc_experience_level != "Choose...":
-                    num_categories += 1
                 if gc_Admission_experience:
                     num_categories += 1
 
                 available_ranks = list(range(1, num_categories + 1))
 
-                # Process all preferences including the new Graduated College
                 for category, options in gc_preferences.items():
                     if options:
                         category_rank = rank_input(f"Rank for {category} (GC)", available_ranks, key=f"gc_rank_{category}")
                         available_ranks.remove(category_rank)
                         for option in options:
-                            # Handle Graduated College differently (no emoji to remove)
-                            if category == 'Credentials':
-                                clean_option = option
-                            else:
-                                clean_option = option.split(" ", 1)[1] if " " in option else option
+                            clean_option = option.split(" ", 1)[1] if " " in option else option
                             gc_points[f"{category}: {clean_option}"] = 10 * (num_categories + 1 - category_rank)
-
-                if gc_experience_level != "Choose...":
-                    category_rank = rank_input(f"Rank for Years of Experience (GC)", available_ranks, key="gc_experience_rank")
-                    available_ranks.remove(category_rank)
-                    gc_points[f"Experience: {gc_experience_level}"] = 10 * (num_categories + 1 - category_rank)
 
                 if gc_Admission_experience:
                     category_rank = rank_input(f"Rank for Admission Results (GC)", available_ranks, key="gc_Admission_rank")
@@ -612,46 +487,51 @@ if st.session_state["authenticated"]:
 
                 st.session_state['gc_points'] = gc_points
 
-
     def calculate_score(df, points):
+        # Always create a Score column, defaulting to 0
+        df["Score"] = 0
+        
+        if not points:  # If no points are assigned, return with all scores = 0
+            return df
+            
         def score_row(row):
             score = 0
             for option, weight in points.items():
                 try:
-                    # Experience Points
-                    if option.startswith("Experience"):
-                        exp_level = int(option.split(": ")[1].replace("+", ""))
-                        if int(row['Experience']) >= exp_level:
-                            score += weight
-                    
                     # Admission Results Points
-                    elif option.startswith("Admission Results"):
-                        Admission_experiences = row.get('Admission Results', "")
-                        if isinstance(Admission_experiences, str):
-                            Admission_experiences = Admission_experiences.split(", ")
-                        if option.split(": ")[1] in Admission_experiences:
+                    if option.startswith("Admission Results"):
+                        admission_experiences = row.get('Admission Results', "")
+                        if isinstance(admission_experiences, str):
+                            # Split and clean each admission result
+                            admission_experiences = [e.strip().lower() for e in admission_experiences.split(",") if e.strip()]
+                        # Check if any matches (case-insensitive)
+                        if option.split(": ")[1].lower() in admission_experiences:
                             score += weight
                     
-                    # General Traits/Subjects
+                    # Credentials Points - Enhanced matching
+                    elif option.startswith("Credentials"):
+                        credentials = row.get('Credentials', "")
+                        if isinstance(credentials, str):
+                            # Split, clean, and normalize credentials
+                            credentials = [c.strip().lower() for c in credentials.split(",") if c.strip()]
+                            # Check if any credential matches (case-insensitive, substring allowed)
+                            selected_cred = option.split(": ")[1].lower()
+                            if any(selected_cred in cred for cred in credentials):
+                                score += weight
+                    
+                    # General Traits/Subjects (case-sensitive for emoji prefixes)
                     else:
                         column, value = option.split(": ")
                         if value in row.get(column, ""):
                             score += weight
-                except (KeyError, TypeError, ValueError):
-                    continue  # Skip invalid rows
+                except (KeyError, TypeError, ValueError) as e:
+                    print(f"Error processing option '{option}': {str(e)}")
+                    continue
             return score
 
         df["Score"] = df.apply(score_row, axis=1)
         return df
 
-
-    # Process counselor data
-    fao_df = calculate_score(fao_df, st.session_state.get('fao_points', {}))
-    gc_df = calculate_score(gc_df, st.session_state.get('gc_points', {}))
-
-
-
-    # Filter out incompatible pairs and resolve conflicts
     def filter_incompatible_pairs(fao_df, gc_df):
         for gc_name, fao_names in incompatible_counselors.items():
             if gc_name in gc_df['Name'].values:
@@ -668,39 +548,30 @@ if st.session_state["authenticated"]:
                             break  # Only remove the GC if there's a strict resolution
         return fao_df, gc_df
 
-    fao_df, gc_df = filter_incompatible_pairs(fao_df, gc_df)
+    def filter_counselors(df, package_type, selected_timezone, selected_student_type):
+        # Apply initial filters
+        df = df[df['Available Timezones'].apply(lambda x: selected_timezone in [tz.strip() for tz in x.split(',')])]
+        df = df[df['Domestic/International'].apply(lambda x: selected_student_type in [t.strip() for t in x.split(',')])]
+        
+        # Filter by package
+        if package_type:
+            df = df[df['Available Packages'].apply(lambda x: package_type in [pkg.strip() for pkg in x.split(',')])]
+        
+        return df
 
-    # Display top 3 counselors after filtering
-    def filter_and_sort_counselors(df, package_type):
-        # Filter out entries with zero or negative spots available
-        if "AC" in package_type and '# AC spots left after recommendations' in df.columns:
-            df = df[df['# AC spots left after recommendations'] > 0]  # Filter out non-positive values
-            # Sort by '# AC spots left after recommendations' and 'Score' both in descending order
-            return df.sort_values(by=['# AC spots left after recommendations', 'Score'], ascending=[False, False])
-        elif "CB" in package_type and '# CB spots left after recommendations' in df.columns:
-            df = df[df['# CB spots left after recommendations'] > 0]  # Filter out non-positive values
-            # Sort by '# CB spots left after recommendations' and 'Score' both in descending order
-            return df.sort_values(by=['# CB spots left after recommendations', 'Score'], ascending=[False, False])
-        return df  # Return the dataframe unmodified if conditions are not met
-
-    # Apply this filtering and sorting logic after determining the available packages
-    if fao_package_available:
-        fao_df = filter_and_sort_counselors(fao_df, selected_fao_package)
-
-    if gc_package_available:
-        gc_df = filter_and_sort_counselors(gc_df, selected_gc_package)
-
-    # Assuming 'fao_df' and 'gc_df' are now properly filtered and sorted, find the top matches:
-    fao_top_matches = fao_df.head(3)  
-    gc_top_matches = gc_df.head(3)
-
-
-
+    # def sort_counselors(df, package_type):
+    #     # Filter out entries with zero or negative spots available
+    #     if "AC" in package_type and '# AC spots left after recommendations' in df.columns:
+    #         df = df[df['# AC spots left after recommendations'] > 0]
+    #         return df.sort_values(by=['# AC spots left after recommendations', 'Score'], ascending=[False, False])
+    #     elif "CB" in package_type and '# CB spots left after recommendations' in df.columns:
+    #         df = df[df['# CB spots left after recommendations'] > 0]
+    #         return df.sort_values(by=['# CB spots left after recommendations', 'Score'], ascending=[False, False])
+    #     return df  # Return the dataframe unmodified if conditions are not met
 
     # def increment_assigned_google_sheet(sheet_name, counselor_name, selected_package, student_name):
     #     try:
-    #         # Open the worksheet
-    #         worksheet = sheet.worksheet(sheet_name)
+    #         worksheet = st.session_state['spreadsheet'].worksheet(sheet_name)
     #         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     #         # Get all records and headers
@@ -725,46 +596,61 @@ if st.session_state["authenticated"]:
 
     #         # Find column indices
     #         try:
-    #             recommended_col_idx = headers.index(recommended_col_name) + 1  # +1 for 1-based index
+    #             recommended_col_idx = headers.index(recommended_col_name) + 1
     #             spots_left_col_idx = headers.index(spots_left_col_name) + 1
-    #         except ValueError:
-    #             st.error(f"Required columns not found in sheet. Available columns: {headers}")
-    #             return False
+    #         except ValueError as e:
+    #             print("Available column names:")
+    #             print(headers)
+    #             raise ValueError(f"Columns for {selected_package} not found. {str(e)}")
 
-    #         # Helper function to safely convert to float
-    #         def safe_float_convert(value):
+    #         # Determine increment/decrement values based on package conditions
+    #         increment_value = 1  # Default increment for AC
+    #         decrement_value = 1  # Default decrement for AC
+    #         if "Biweekly" in selected_package and 'FAO' in sheet_name:
+    #             increment_value = 3  # FAO Biweekly packages increment/decrement by 3
+    #             decrement_value = 3
+    #         elif "Monthly" in selected_package and 'GC' in sheet_name:
+    #             increment_value = 0.5  # GC Monthly packages increment/decrement by 0.5
+    #             decrement_value = 0.5
+
+    #         # Get current values safely
+    #         def get_float_value(row, col):
+    #             value = worksheet.cell(row, col).value
     #             try:
     #                 return float(value) if value else 0.0
-    #             except (ValueError, TypeError):
-    #                 return 0.0
+    #             except ValueError:
+    #                 raise ValueError(f"Non-numeric value in cell ({row}, {col}): {value}")
 
-    #         # Get current values with safe conversion
-    #         current_recommended = safe_float_convert(worksheet.cell(row_index, recommended_col_idx).value)
-    #         current_spots_left = safe_float_convert(worksheet.cell(row_index, spots_left_col_idx).value)
+    #         current_recommended = get_float_value(row_index, recommended_col_idx)
+    #         current_spots_left = get_float_value(row_index, spots_left_col_idx)
 
-    #         # Update values while maintaining float precision
-    #         worksheet.update_cell(row_index, recommended_col_idx, current_recommended + 1)
-    #         worksheet.update_cell(row_index, spots_left_col_idx, current_spots_left - 1)  # Can be negative
+    #         # Update values
+    #         worksheet.update_cell(row_index, recommended_col_idx, current_recommended + increment_value)
+    #         worksheet.update_cell(row_index, spots_left_col_idx, current_spots_left - decrement_value)
 
-    #         # Find or create student column
-    #         student_col_name = f'{student_col_prefix} {int(current_recommended) + 1}'
-    #         try:
-    #             student_col_idx = headers.index(student_col_name) + 1
-    #         except ValueError:
-    #             # Add new column if it doesn't exist
+    #         # Find the first empty student column
+    #         student_col_idx = None
+    #         for i, header in enumerate(headers, start=1):
+    #             if header.startswith(student_col_prefix):
+    #                 if not worksheet.cell(row_index, i).value:
+    #                     student_col_idx = i
+    #                     break
+            
+    #         if student_col_idx is None:
+    #             # Add new column if all existing ones are filled
     #             student_col_idx = len(headers) + 1
-    #             worksheet.update_cell(1, student_col_idx, student_col_name)
-    #             headers.append(student_col_name)  # Update headers list
+    #             worksheet.update_cell(1, student_col_idx, f"{student_col_prefix} {int(current_recommended + increment_value)}")
+    #             headers = worksheet.row_values(1)  # Refresh headers after adding new column
 
-    #         # Add student info
-    #         worksheet.update_cell(row_index, student_col_idx, f'{student_name} - {now}')
+    #         # Add student info to the first empty column
+    #         worksheet.update_cell(row_index, student_col_idx, f"{student_name} - {now}")
 
     #         return True
 
     #     except Exception as e:
     #         st.error(f"Error updating Google Sheet: {str(e)}")
     #         import traceback
-    #         st.error(traceback.format_exc())  # Show full traceback for debugging
+    #         st.error(traceback.format_exc())
     #         return False
 
     # def display_and_select_counselors(df, state_key, counselor_type):
@@ -773,11 +659,13 @@ if st.session_state["authenticated"]:
     #         selected = st.session_state.get(state_key) == row['Name']
     #         counselor_card = f"""
     #         <div class="profile-card" style="background-color: {'#ADD8E6' if selected else '#FFFFFF'};">
-    #             <h3>{row['Name']}</h3>
+    #             <div style="display: flex; justify-content: space-between; align-items: center;">
+    #                 <h3>{row['Name']}</h3>
+    #             </div>
     #             <p><strong>Personality Traits:</strong> {row[f'{counselor_type} Personality Traits']}</p>
     #             <p><strong>Subjects:</strong> {row['Subjects']}</p>
     #             <p><strong>Timezone:</strong> {row['Available Timezones']}</p>
-    #             <p><strong>Degree:</strong> {row['Degree Classification']}</p>
+    #             <p><strong>Credentials:</strong> {row['Credentials']}</p>
     #         </div>
     #         """
     #         st.markdown(counselor_card, unsafe_allow_html=True)
@@ -791,6 +679,40 @@ if st.session_state["authenticated"]:
     #                 st.rerun()
 
     # if st.button("Find Top Counselors"):
+    #     # Apply all filters at once to minimize API calls
+    #     if fao_package_available:
+    #         fao_df_filtered = filter_counselors(
+    #             fao_df.copy(), 
+    #             selected_fao_package, 
+    #             selected_timezone, 
+    #             selected_student_type
+    #         )
+    #         if 'fao_points' in st.session_state:
+    #             fao_df_filtered = calculate_score(fao_df_filtered, st.session_state['fao_points'])
+    #         fao_df_filtered = sort_counselors(fao_df_filtered, selected_fao_package)
+    #         st.session_state['fao_top_matches'] = fao_df_filtered.head(3)
+        
+    #     if gc_package_available:
+    #         gc_df_filtered = filter_counselors(
+    #             gc_df.copy(), 
+    #             selected_gc_package, 
+    #             selected_timezone, 
+    #             selected_student_type
+    #         )
+    #         if 'gc_points' in st.session_state:
+    #             gc_df_filtered = calculate_score(gc_df_filtered, st.session_state['gc_points'])
+    #         gc_df_filtered = sort_counselors(gc_df_filtered, selected_gc_package)
+    #         st.session_state['gc_top_matches'] = gc_df_filtered.head(3)
+        
+    #     # Filter incompatible pairs after all other filters
+    #     if fao_package_available and gc_package_available and 'fao_top_matches' in st.session_state and 'gc_top_matches' in st.session_state:
+    #         fao_filtered, gc_filtered = filter_incompatible_pairs(
+    #             st.session_state['fao_top_matches'].copy(),
+    #             st.session_state['gc_top_matches'].copy()
+    #         )
+    #         st.session_state['fao_top_matches'] = fao_filtered
+    #         st.session_state['gc_top_matches'] = gc_filtered
+        
     #     st.session_state['show_results'] = True
     #     st.session_state['selection_sent'] = False
 
@@ -798,13 +720,13 @@ if st.session_state["authenticated"]:
     #     st.header("Top Counselor Matches")
     #     cols = st.columns(2) if fao_package_available and gc_package_available else [st.container()]
 
-    #     if fao_package_available:
+    #     if fao_package_available and 'fao_top_matches' in st.session_state:
     #         with cols[0]:
-    #             display_and_select_counselors(fao_top_matches, 'selected_fao', 'FAO')
+    #             display_and_select_counselors(st.session_state['fao_top_matches'], 'selected_fao', 'FAO')
 
-    #     if gc_package_available:
+    #     if gc_package_available and 'gc_top_matches' in st.session_state:
     #         with cols[1] if fao_package_available else cols[0]:
-    #             display_and_select_counselors(gc_top_matches, 'selected_gc', 'GC')
+    #             display_and_select_counselors(st.session_state['gc_top_matches'], 'selected_gc', 'GC')
 
     #     both_packages_required = fao_package_available and gc_package_available
     #     fao_selected = st.session_state.get('selected_fao')
@@ -838,55 +760,80 @@ if st.session_state["authenticated"]:
     #     st.session_state.clear()
     #     st.rerun()
 
+    def sort_counselors(df, package_type):
+        # Filter out entries with zero or negative spots available
+        if "AC" in package_type and '# AC spots left after recommendations' in df.columns:
+            df = df[df['# AC spots left after recommendations'] > 0]
+            return df.sort_values(by=['# AC spots left after recommendations', 'Score'], ascending=[False, False])
+        elif "CB" in package_type and '# CB spots left after recommendations' in df.columns:
+            df = df[df['# CB spots left after recommendations'] > 0]
+            return df.sort_values(by=['# CB spots left after recommendations', 'Score'], ascending=[False, False])
+        return df  # Return the dataframe unmodified if conditions are not met
+
+    def display_counselors(df, counselor_type):
+        st.subheader(f"Top {counselor_type} Matches")
+        for _, row in df.iterrows():
+            counselor_card = f"""
+            <div class="profile-card" style="background-color: #FFFFFF;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <h3>{row['Name']}</h3>
+                </div>
+                <p><strong>Personality Traits:</strong> {row[f'{counselor_type} Personality Traits']}</p>
+                <p><strong>Subjects:</strong> {row['Subjects']}</p>
+                <p><strong>Timezone:</strong> {row['Available Timezones']}</p>
+            </div>
+            """
+            st.markdown(counselor_card, unsafe_allow_html=True)
 
     if st.button("Find Top Counselors"):
-        st.header("Top Counselor Matches")
-        # Conditionally create columns based on whether both, one, or none are available
-        if fao_package_available and gc_package_available:
-            col1, col2 = st.columns(2)
-        elif fao_package_available or gc_package_available:
-            col1 = st.container()  # Use a single full-width container for displaying matches
-
-        # Display FAO matches if available
+        # Apply all filters at once to minimize API calls
         if fao_package_available:
-            fao_top_matches = fao_df.sort_values(by="Score", ascending=False).head(3)
-            with col1:
-                st.subheader("Top FAO Matches")
-                for _, row in fao_top_matches.iterrows():
-                    st.markdown(f"""
-                    <div class="profile-card">
-                        <h3>{row['Name']}</h3>
-                        <p><strong>Personality Traits:</strong> {row['FAO Personality Traits']}</p>
-                        <p><strong>Subjects:</strong> {row['Subjects']}</p>
-                        <p><strong>Timezone:</strong> {row['Available Timezones']}</p>
-                        <p><strong>Degree:</strong> {row['Degree Classification']}</p>
-                    </div>
-                    """, unsafe_allow_html=True)
-
-        # Display GC matches if available
+            fao_df_filtered = filter_counselors(
+                fao_df.copy(), 
+                selected_fao_package, 
+                selected_timezone, 
+                selected_student_type
+            )
+            if 'fao_points' in st.session_state:
+                fao_df_filtered = calculate_score(fao_df_filtered, st.session_state['fao_points'])
+            fao_df_filtered = sort_counselors(fao_df_filtered, selected_fao_package)
+            st.session_state['fao_top_matches'] = fao_df_filtered.head(3)
+        
         if gc_package_available:
-            gc_top_matches = gc_df.sort_values(by="Score", ascending=False).head(3)
-            # Use col2 if both available, otherwise use col1 which is a full-width container
-            target_column = col2 if fao_package_available and gc_package_available else col1
-            with target_column:
-                st.subheader("Top GC Matches")
-                for _, row in gc_top_matches.iterrows():
-                    st.markdown(f"""
-                    <div class="profile-card">
-                        <h3>{row['Name']}</h3>
-                        <p><strong>Personality Traits:</strong> {row['GC Personality Traits']}</p>
-                        <p><strong>Subjects:</strong> {row['Subjects']}</p>
-                        <p><strong>Timezone:</strong> {row['Available Timezones']}</p>
-                        <p><strong>Degree:</strong> {row['Degree Classification']}</p>
-                    </div>
-                    """, unsafe_allow_html=True)
+            gc_df_filtered = filter_counselors(
+                gc_df.copy(), 
+                selected_gc_package, 
+                selected_timezone, 
+                selected_student_type
+            )
+            if 'gc_points' in st.session_state:
+                gc_df_filtered = calculate_score(gc_df_filtered, st.session_state['gc_points'])
+            gc_df_filtered = sort_counselors(gc_df_filtered, selected_gc_package)
+            st.session_state['gc_top_matches'] = gc_df_filtered.head(3)
+        
+        # Filter incompatible pairs after all other filters
+        if fao_package_available and gc_package_available and 'fao_top_matches' in st.session_state and 'gc_top_matches' in st.session_state:
+            fao_filtered, gc_filtered = filter_incompatible_pairs(
+                st.session_state['fao_top_matches'].copy(),
+                st.session_state['gc_top_matches'].copy()
+            )
+            st.session_state['fao_top_matches'] = fao_filtered
+            st.session_state['gc_top_matches'] = gc_filtered
+        
+        st.session_state['show_results'] = True
 
-        # Display a warning if no packages are available
-        if not fao_package_available and not gc_package_available:
-            st.warning("No available packages selected for matching. Please select a package to find matches.")
+    if st.session_state.get('show_results'):
+        st.header("Top Counselor Matches")
+        cols = st.columns(2) if fao_package_available and gc_package_available else [st.container()]
+
+        if fao_package_available and 'fao_top_matches' in st.session_state:
+            with cols[0]:
+                display_counselors(st.session_state['fao_top_matches'], 'FAO')
+
+        if gc_package_available and 'gc_top_matches' in st.session_state:
+            with cols[1] if fao_package_available else cols[0]:
+                display_counselors(st.session_state['gc_top_matches'], 'GC')
 
     if st.button("Start new"):
-        st.session_state['reset'] = True  # Set the flag to reset all states
+        st.session_state.clear()
         st.rerun()
-
-
