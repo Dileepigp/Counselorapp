@@ -16,7 +16,7 @@ st.set_page_config(
 
 # Authentication credentials
 USERNAME = "counselorapp"
-PASSWORD = "igp123"
+PASSWORD = "igpcsapp@#*25"
 
 # Authentication function
 def authenticate(username, password):
