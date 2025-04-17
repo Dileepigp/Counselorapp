@@ -362,7 +362,7 @@ if st.session_state["authenticated"]:
     fao_timezones = extract_unique_values(fao_df, 'Available Timezones')
     gc_timezones = extract_unique_values(gc_df, 'Available Timezones')
     combined_timezones = sorted(set(fao_timezones).union(set(gc_timezones)))
-    selected_timezone = st.selectbox("Select Timezone", combined_timezones)
+    selected_timezone = st.selectbox("Student's Time Zone During School Year", combined_timezones)
 
     # Student type selection
     fao_student_types = extract_unique_values(fao_df, 'Domestic/International')
