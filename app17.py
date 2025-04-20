@@ -368,7 +368,7 @@ if st.session_state["authenticated"]:
     fao_student_types = extract_unique_values(fao_df, 'Domestic/International')
     gc_student_types = extract_unique_values(gc_df, 'Domestic/International')
     combined_student_types = sorted(set(fao_student_types).union(set(gc_student_types)))
-    selected_student_type = st.selectbox("Select Student Type", combined_student_types)
+    selected_student_type = st.selectbox("Select Student Package", combined_student_types)
 
     # Package selection
     def get_linked_package(selected_package, package_mapping):
@@ -761,42 +761,65 @@ if st.session_state["authenticated"]:
 
 
     def display_and_select_counselors(df, state_key, counselor_type):
-            st.subheader(f"Top {counselor_type} Matches")
-            for index, row in df.iterrows():
-                selected = st.session_state.get(state_key) == row['Name']
-                counselor_card = f"""
-                <div class="profile-card" style="background-color: {'#ADD8E6' if selected else '#FFFFFF'};">
-                    <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <h3>{row['Name']}</h3>
-                    </div>
-                """
-                if counselor_type == 'FAO':
-                    degree = row.get('Degree', '')
-                    admission_experience = row.get('Admissions Experience', '')
-                    if degree:
-                        counselor_card += f"<p><strong>Degree:</strong> {degree}</p>"
-                    if admission_experience:
-                        counselor_card += f"<p><strong>Admissions Experience:</strong> {admission_experience}</p>"
+        st.subheader(f"Top {counselor_type} Matches")
+        
+        # Determine selection limit based on package
+        if counselor_type == 'FAO':
+            fao_package = st.session_state.get('fao_package', '')
+            selection_limit = 2 if fao_package == 'CB FAO Biweekly Meeting (Diamond)' else 1
+        elif counselor_type == 'GC':
+            fao_package = st.session_state.get('fao_package', '')
+            selection_limit = 0 if fao_package == 'CB FAO Biweekly Meeting (Diamond)' else 2
+        else:
+            selection_limit = 1  # default fallback
 
-                elif counselor_type == 'GC':
-                    degree = row.get('Degree', '')
-                    if degree:
-                        counselor_card += f"<p><strong>Degree:</strong> {degree}</p>"
+        # Ensure session state list exists
+        selected_names = st.session_state.get(state_key, [])
 
-                counselor_card += f"""
+        for index, row in df.iterrows():
+            is_selected = row['Name'] in selected_names
+
+            # Render card
+            counselor_card = f"""
+            <div class="profile-card" style="background-color: {'#ADD8E6' if is_selected else '#FFFFFF'};">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <h3>{row['Name']}</h3>
                 </div>
-                """
-                st.markdown(counselor_card, unsafe_allow_html=True)
-                button_key = f"{counselor_type.lower()}{index}"
-                if st.button(f"Select {row['Name']}", key=button_key):
-                    st.session_state[state_key] = row['Name']
-                    st.session_state[f'other_selected_{counselor_type}'] = [st.session_state.get(f'selected_{ct}', '') for ct in ['fao', 'gc'] if ct != counselor_type.lower()]
-                    if row['Name'] in st.session_state[f'other_selected_{counselor_type}']:
-                        st.error("This counselor has already been selected in another section.")
+            """
+
+            if counselor_type == 'FAO':
+                degree = row.get('Degree', '')
+                admission_experience = row.get('Admissions Experience', '')
+                if degree:
+                    counselor_card += f"<p><strong>Degree:</strong> {degree}</p>"
+                if admission_experience:
+                    counselor_card += f"<p><strong>Admissions Experience:</strong> {admission_experience}</p>"
+            elif counselor_type == 'GC':
+                degree = row.get('Degree', '')
+                if degree:
+                    counselor_card += f"<p><strong>Degree:</strong> {degree}</p>"
+
+            counselor_card += f"<p><strong>Selected:</strong> {'✅' if is_selected else '❌'}</p></div>"
+            st.markdown(counselor_card, unsafe_allow_html=True)
+
+            button_key = f"{counselor_type.lower()}_{index}"
+            button_label = "Deselect" if is_selected else "Select"
+            if st.button(f"{button_label} {row['Name']}", key=button_key):
+                if is_selected:
+                    selected_names.remove(row['Name'])
+                else:
+                    if len(selected_names) >= selection_limit:
+                        st.warning(f"You can select up to {selection_limit} {counselor_type}(s).")
                     else:
-                        st.rerun()
+                        selected_names.append(row['Name'])
+
+                st.session_state[state_key] = selected_names
+                st.rerun()
+
 
     if st.button("Find Top Counselors"):
+        st.session_state['selected_fao'] = []
+        st.session_state['selected_gc'] = []
         # Initialize validation flags
         fao_needs_ranking = False
         gc_needs_ranking = False
@@ -879,6 +902,19 @@ if st.session_state["authenticated"]:
                 )
                 st.session_state['fao_top_matches'] = fao_filtered
                 st.session_state['gc_top_matches'] = gc_filtered
+
+            # Clean previously selected counselors not in top matches
+            if fao_package_available and 'fao_top_matches' in st.session_state:
+                valid_fao_names = st.session_state['fao_top_matches']['Name'].tolist()
+                st.session_state['selected_fao'] = [
+                    name for name in st.session_state.get('selected_fao', []) if name in valid_fao_names
+                ]
+
+            if gc_package_available and 'gc_top_matches' in st.session_state:
+                valid_gc_names = st.session_state['gc_top_matches']['Name'].tolist()
+                st.session_state['selected_gc'] = [
+                    name for name in st.session_state.get('selected_gc', []) if name in valid_gc_names
+                ]
             
             # Set flags for results display
             st.session_state['show_results'] = True
@@ -913,8 +949,9 @@ if st.session_state["authenticated"]:
         
         # Check conditions for showing Submit button
         both_packages_required = fao_package_available and gc_package_available
-        fao_selected = st.session_state.get('selected_fao')
-        gc_selected = st.session_state.get('selected_gc')
+        fao_selected = st.session_state.get('selected_fao', [])
+        gc_selected = st.session_state.get('selected_gc', [])
+
         
         # Create centered columns for buttons
         button_col1, button_col2, button_col3 = st.columns([2, 1, 2])
@@ -936,9 +973,13 @@ if st.session_state["authenticated"]:
                 
                 success = True
                 if fao_selected:
-                    success &= increment_assigned_google_sheet('UG FAOs', st.session_state['selected_fao'], selected_fao_package, student_name)
+                    for fao_name in fao_selected:
+                        success &= increment_assigned_google_sheet('UG FAOs', fao_name, selected_fao_package, student_name)
+
                 if gc_selected:
-                    success &= increment_assigned_google_sheet('US UG GCs', st.session_state['selected_gc'], selected_gc_package, student_name)
+                    for gc_name in gc_selected:
+                        success &= increment_assigned_google_sheet('US UG GCs', gc_name, selected_gc_package, student_name)
+
                 
                 if success:
                     st.success("Submitted choices successfully!")
