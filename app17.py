@@ -374,8 +374,8 @@ if st.session_state["authenticated"]:
     selected_timezone = st.selectbox("Student's Time Zone During School Year", combined_timezones)
 
     # Student type selection
-    fao_student_types = extract_unique_values(fao_df, 'Domestic/International')
-    gc_student_types = extract_unique_values(gc_df, 'Domestic/International')
+    fao_student_types = extract_unique_values(fao_df, 'a la carte/Comprehensive')
+    gc_student_types = extract_unique_values(gc_df, 'a la carte/Comprehensive')
     combined_student_types = sorted(set(fao_student_types).union(set(gc_student_types)))
     selected_student_type = st.selectbox("Select Student Package", combined_student_types)
 
@@ -643,7 +643,7 @@ if st.session_state["authenticated"]:
     def filter_counselors(df, package_type, selected_timezone, selected_student_type):
         # Apply initial filters
         df = df[df['Available Timezones'].apply(lambda x: selected_timezone in [tz.strip() for tz in x.split(',')])]
-        df = df[df['Domestic/International'].apply(lambda x: selected_student_type in [t.strip() for t in x.split(',')])]
+        df = df[df['a la carte/Comprehensive'].apply(lambda x: selected_student_type in [t.strip() for t in x.split(',')])]
         
         # Filter by package
         if package_type:
@@ -655,10 +655,10 @@ if st.session_state["authenticated"]:
         # Filter out entries with zero or negative spots available
         if "AC" in package_type and '# AC spots left after recommendations' in df.columns:
             df = df[df['# AC spots left after recommendations'] > 0]
-            return df.sort_values(by=['# AC spots left after recommendations', 'Score'], ascending=[False, False])
+            return df.sort_values(by=['Score','# AC spots left after recommendations'], ascending=[False, False])
         elif "CB" in package_type and '# CB spots left after recommendations' in df.columns:
             df = df[df['# CB spots left after recommendations'] > 0]
-            return df.sort_values(by=['# CB spots left after recommendations', 'Score'], ascending=[False, False])
+            return df.sort_values(by=['Score','# CB spots left after recommendations'], ascending=[False, False])
         return df  # Return the dataframe unmodified if conditions are not met
 
 
