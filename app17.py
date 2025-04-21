@@ -44,11 +44,14 @@ if not st.session_state["authenticated"]:
 
 # Main App
 if st.session_state["authenticated"]:
-    # Logout button
+    # Logout button - modified to properly reset the session state
     if st.button("Logout"):
+        # Clear all session state variables except the ones needed for login
         for key in list(st.session_state.keys()):
-            del st.session_state[key]
-        st.experimental_set_query_params()  # Reset the app state
+            if key not in ["authenticated"]:  # Keep the authenticated key
+                del st.session_state[key]
+        st.session_state["authenticated"] = False  # Set to False to show login page
+        st.rerun()
 
     # Initialize Google Sheets Client only once
     if 'client' not in st.session_state:
@@ -282,10 +285,16 @@ if st.session_state["authenticated"]:
 
     # Input for student name
 # Replace the current student name input with this expanded section
+# Input for student name
     student_name = st.text_input("Enter Student Name:", key="student_name", value="")
     if student_name.strip() == "":
         st.warning("Please enter the student name before proceeding.")
         st.stop()
+
+    # Dropdown for student grade level
+    grade_levels = ["7", "8", "9", "10", "11", "12", "College Transfer"]
+    student_grade = st.selectbox("Select Student's Grade Level", grade_levels, key="student_grade")
+
 
     # Add new fields for Responsible Region and Hubspot Deal
     responsible_regions = [
