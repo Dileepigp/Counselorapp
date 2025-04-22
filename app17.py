@@ -90,6 +90,58 @@ if st.session_state["authenticated"]:
     fao_df = clean_counselor_data(st.session_state['fao_df'])
     gc_df = clean_counselor_data(st.session_state['gc_df'])
     college_rankings_df = clean_college_rankings(st.session_state['college_rankings_df'])
+    # College groups
+    ivy_colleges = {
+        "Harvard University", "Yale University", "Princeton University",
+        "Columbia University", "University of Pennsylvania", "Dartmouth College",
+        "Brown University", "Cornell University"
+    }
+
+    top10_colleges = {
+        "Princeton University", "Massachusetts Institute of Technology", "Harvard University",
+        "Stanford University", "Yale University", "California Institute of Technology",
+        "Duke University", "Johns Hopkins University", "Northwestern University",
+        "University of Pennsylvania"
+    }
+
+    liberal_arts_colleges = {
+        "Williams College", "Amherst College", "Swarthmore College", "United States Naval Academy",
+        "Bowdoin College", "Pomona College", "Wellesley College", "Carleton College",
+        "Claremont McKenna College", "Harvey Mudd College", "Vassar College", "Barnard College",
+        "Davidson College", "Hamilton College", "Smith College", "Wesleyan University",
+        "Grinnell College", "Middlebury College", "Washington and Lee University"
+    }
+
+    hypsm_colleges = {
+        "Harvard University", "Yale University", "Princeton University",
+        "Stanford University", "Massachusetts Institute of Technology"
+    }
+
+    top20_colleges = {
+        "Princeton University", "Massachusetts Institute of Technology", "Harvard University",
+        "Stanford University", "Yale University", "California Institute of Technology",
+        "Duke University", "Johns Hopkins University", "Northwestern University",
+        "University of Pennsylvania", "Cornell University", "University of Chicago",
+        "Brown University", "Columbia University", "Dartmouth College",
+        "University of California-Los Angeles", "University of California-Berkeley",
+        "Rice University", "University of Notre Dame", "Vanderbilt University"
+    }
+
+    # Normalize college names
+    all_colleges = set(college_rankings_df['COLLEGE'])
+
+    # Derive the 'Other Schools'
+    other_schools = all_colleges - (ivy_colleges | top10_colleges | liberal_arts_colleges | hypsm_colleges | top20_colleges)
+
+    # Create a dictionary for grouped options
+    grouped_credentials = {
+        "IVY Colleges": sorted(ivy_colleges & all_colleges),
+        "Top 10 Universities": sorted(top10_colleges & all_colleges),
+        "Liberal Arts Colleges": sorted(liberal_arts_colleges & all_colleges),
+        "HYPSM": sorted(hypsm_colleges & all_colleges),
+        "Top 20 Universities": sorted(top20_colleges & all_colleges),
+        "Other Schools": sorted(other_schools)
+    }
 
     # Standard cleaning for both DataFrames
     for df in [fao_df, gc_df]:
@@ -479,8 +531,9 @@ if st.session_state["authenticated"]:
         return rank
 
     # Extract unique credentials for each counselor type
-    fao_credentials = college_rankings_df['COLLEGE'].tolist()
-    gc_credentials = college_rankings_df['COLLEGE'].tolist()
+    fao_credentials = grouped_credentials
+    gc_credentials = grouped_credentials
+
 
     # Split Screen: FAO on the left, GC on the right
     col1, col2 = st.columns([1, 1])
@@ -496,14 +549,46 @@ if st.session_state["authenticated"]:
         with col1:
             with st.expander("FAO Counselors Section", expanded=True):
                 st.subheader("Preferences for FAO Counselors")
+                
+                # FAO Preferences for traits and subjects (multiselect with max 3)
                 fao_preferences = {
-                    'FAO Personality Traits': st.multiselect("Select preferred personality traits (FAO)", fao_traits_options, key="fao_traits",max_selections=3),
-                    'Subjects': st.multiselect("Select subjects of interest (FAO)", subjects_options, key="fao_subjects",max_selections=3),
-                    'Credentials': st.multiselect("Preferred Credentials (Graduated College - FAO)", fao_credentials, key="fao_credentials",max_selections=3)
+                    'FAO Personality Traits': st.multiselect(
+                        "Select preferred personality traits (FAO)", 
+                        fao_traits_options, 
+                        key="fao_traits", 
+                        max_selections=3
+                    ),
+                    'Subjects': st.multiselect(
+                        "Select subjects of interest (FAO)", 
+                        subjects_options, 
+                        key="fao_subjects", 
+                        max_selections=3
+                    )
                 }
+
+                # === CREDENTIALS (Grouped Select) ===
+                fao_credentials_group = st.selectbox(
+                    "Select a College Group for Credentials (FAO)", 
+                    list(fao_credentials.keys()), 
+                    key="fao_group"
+                )
+                fao_selected_credential = st.multiselect(
+                    "Select College from Group (FAO - Credential)", 
+                    options=fao_credentials[fao_credentials_group], 
+                    key="fao_credentials",max_selections=3
+                )
+                if fao_selected_credential:
+                    fao_preferences['Credentials'] = [fao_selected_credential]  # store as list to reuse existing logic
+
+                # === ADMISSION EXPERIENCE (Grouped Select) ===
+                fao_admission_group = st.selectbox(
+                    "Select a College Group for Admission Results (FAO)", 
+                    list(grouped_credentials.keys()), 
+                    key="fao_admission_group"
+                )
                 fao_Admission_experience = st.multiselect(
-                    "Preferred Admission Results (FAO)", 
-                    Admission_experience_options, 
+                    "Select College from Group (FAO - Admission Result)", 
+                    options=grouped_credentials[fao_admission_group], 
                     key="fao_Admission",max_selections=3
                 )
 
@@ -530,24 +615,56 @@ if st.session_state["authenticated"]:
                 if fao_Admission_experience:
                     category_rank = rank_input(f"Rank for Admission Results (FAO)", available_ranks, key="fao_Admission_rank")
                     available_ranks.remove(category_rank)
-                    for exp in fao_Admission_experience:
-                        fao_points[f"Admission Results: {exp}"] = 10 * (num_categories + 1 - category_rank)
+                    fao_points[f"Admission Results: {fao_Admission_experience}"] = 10 * (num_categories + 1 - category_rank)
 
                 st.session_state['fao_points'] = fao_points
+
 
     # GC Section
     if gc_package_available:
         with col2:
             with st.expander("GC Counselors Section", expanded=True):
                 st.subheader("Preferences for GC Counselors")
+
+                # GC Preferences: traits and subjects
                 gc_preferences = {
-                    'GC Personality Traits': st.multiselect("Select preferred personality traits (GC)", fao_traits_options, key="gc_traits",max_selections=3),
-                    'Subjects': st.multiselect("Select subjects of interest (GC)", subjects_options, key="gc_subjects",max_selections=3),
-                    'Credentials': st.multiselect("Preferred Credentials (Graduated College - GC)", gc_credentials, key="gc_credentials",max_selections=3)
+                    'GC Personality Traits': st.multiselect(
+                        "Select preferred personality traits (GC)",
+                        fao_traits_options,
+                        key="gc_traits",
+                        max_selections=3
+                    ),
+                    'Subjects': st.multiselect(
+                        "Select subjects of interest (GC)",
+                        subjects_options,
+                        key="gc_subjects",
+                        max_selections=3
+                    )
                 }
+
+                # === CREDENTIALS (Grouped Select) ===
+                gc_credentials_group = st.selectbox(
+                    "Select a College Group for Credentials (GC)",
+                    list(gc_credentials.keys()),
+                    key="gc_group"
+                )
+                gc_selected_credential = st.multiselect(
+                    "Select College from Group (GC - Credential)",
+                    options=gc_credentials[gc_credentials_group],
+                    key="gc_credentials",max_selections=3
+                )
+                if gc_selected_credential:
+                    gc_preferences['Credentials'] = [gc_selected_credential]  # store as list for scoring logic
+
+                # === ADMISSION EXPERIENCE (Grouped Select) ===
+                gc_admission_group = st.selectbox(
+                    "Select a College Group for Admission Results (GC)",
+                    list(grouped_credentials.keys()),
+                    key="gc_admission_group"
+                )
                 gc_Admission_experience = st.multiselect(
-                    "Preferred Admission Results (GC)", 
-                    Admission_experience_options, 
+                    "Select College from Group (GC - Admission Result)",
+                    options=grouped_credentials[gc_admission_group],
                     key="gc_Admission",max_selections=3
                 )
 
@@ -574,43 +691,46 @@ if st.session_state["authenticated"]:
                 if gc_Admission_experience:
                     category_rank = rank_input(f"Rank for Admission Results (GC)", available_ranks, key="gc_Admission_rank")
                     available_ranks.remove(category_rank)
-                    for exp in gc_Admission_experience:
-                        gc_points[f"Admission Results: {exp}"] = 10 * (num_categories + 1 - category_rank)
+                    gc_points[f"Admission Results: {gc_Admission_experience}"] = 10 * (num_categories + 1 - category_rank)
 
                 st.session_state['gc_points'] = gc_points
 
+
     def calculate_score(df, points):
-        # Always create a Score column, defaulting to 0
         df["Score"] = 0
-        
-        if not points:  # If no points are assigned, return with all scores = 0
+        if not points:
             return df
-            
+
+        def normalize_list(raw_text):
+            if not isinstance(raw_text, str):
+                return []
+            separators = [",", "\n", "•", "  ", "\t"]
+            for sep in separators:
+                raw_text = raw_text.replace(sep, ",")
+            return [item.strip().lower() for item in raw_text.split(",") if item.strip()]
+
         def score_row(row):
             score = 0
             for option, weight in points.items():
                 try:
-                    # Admission Results Points
                     if option.startswith("Admission Results"):
-                        admission_experiences = row.get('Admission Results', "")
-                        if isinstance(admission_experiences, str):
-                            # Split and clean each admission result
-                            admission_experiences = [e.strip().lower() for e in admission_experiences.split(",") if e.strip()]
-                        # Check if any matches (case-insensitive)
-                        if option.split(": ")[1].lower() in admission_experiences:
-                            score += weight
-                    
-                    # Credentials Points - Enhanced matching
+                        # Admission Results scoring (multiple matches)
+                        selected_colleges = option.split(": ")[1].strip("[]").split(",")
+                        selected_colleges = [c.strip().lower().strip("'\"") for c in selected_colleges]
+                        admission_experiences = normalize_list(row.get('Admission Results', ""))
+                        matches = sum(1 for college in selected_colleges if college in admission_experiences)
+                        if matches > 0:
+                            score += weight * matches
+
                     elif option.startswith("Credentials"):
-                        credentials = row.get('Credentials', "")
-                        if isinstance(credentials, str):
-                            # Split, clean, and normalize credentials
-                            credentials = [c.strip().lower() for c in credentials.split(",") if c.strip()]
-                            # Check if any credential matches (case-insensitive, substring allowed)
-                            selected_cred = option.split(": ")[1].lower()
-                            if any(selected_cred in cred for cred in credentials):
-                                score += weight
-                    
+                        # Credentials scoring (multiple matches)
+                        selected_creds = option.split(": ")[1].strip("[]").split(",")
+                        selected_creds = [c.strip().lower().strip("'\"") for c in selected_creds]
+                        credentials = normalize_list(row.get('Credentials', ""))
+                        matches = sum(1 for cred in selected_creds if cred in credentials)
+                        if matches > 0:
+                            score += weight * matches
+
                     # General Traits/Subjects (case-sensitive for emoji prefixes)
                     else:
                         column, value = option.split(": ")
@@ -623,6 +743,7 @@ if st.session_state["authenticated"]:
 
         df["Score"] = df.apply(score_row, axis=1)
         return df
+
 
     def filter_incompatible_pairs(fao_df, gc_df):
         for gc_name, fao_names in incompatible_counselors.items():
@@ -787,12 +908,14 @@ if st.session_state["authenticated"]:
 
         for index, row in df.iterrows():
             is_selected = row['Name'] in selected_names
+            score = row.get('Score', 0)
 
             # Render card
             counselor_card = f"""
             <div class="profile-card" style="background-color: {'#ADD8E6' if is_selected else '#FFFFFF'};">
                 <div style="display: flex; justify-content: space-between; align-items: center;">
                     <h3>{row['Name']}</h3>
+                    <span style="font-weight: bold; color: #005CAA;">Score: {score}</span>
                 </div>
             """
 
@@ -824,6 +947,7 @@ if st.session_state["authenticated"]:
 
                 st.session_state[state_key] = selected_names
                 st.rerun()
+
 
 
     if st.button("Find Top Counselors"):
@@ -1005,80 +1129,4 @@ if st.session_state["authenticated"]:
                 st.session_state["authenticated"] = True  # Keep user logged in
                 st.session_state["reset"] = True  # Reset user form inputs
                 st.rerun()
-    # def sort_counselors(df, package_type):
-    #     # Filter out entries with zero or negative spots available
-    #     if "AC" in package_type and '# AC spots left after recommendations' in df.columns:
-    #         df = df[df['# AC spots left after recommendations'] > 0]
-    #         return df.sort_values(by=['# AC spots left after recommendations', 'Score'], ascending=[False, False])
-    #     elif "CB" in package_type and '# CB spots left after recommendations' in df.columns:
-    #         df = df[df['# CB spots left after recommendations'] > 0]
-    #         return df.sort_values(by=['# CB spots left after recommendations', 'Score'], ascending=[False, False])
-    #     return df  # Return the dataframe unmodified if conditions are not met
 
-    # def display_counselors(df, counselor_type):
-    #     st.subheader(f"Top {counselor_type} Matches")
-    #     for _, row in df.iterrows():
-    #         counselor_card = f"""
-    #         <div class="profile-card" style="background-color: #FFFFFF;">
-    #             <div style="display: flex; justify-content: space-between; align-items: center;">
-    #                 <h3>{row['Name']}</h3>
-    #             </div>
-    #             <p><strong>Personality Traits:</strong> {row[f'{counselor_type} Personality Traits']}</p>
-    #             <p><strong>Subjects:</strong> {row['Subjects']}</p>
-    #             <p><strong>Timezone:</strong> {row['Available Timezones']}</p>
-    #         </div>
-    #         """
-    #         st.markdown(counselor_card, unsafe_allow_html=True)
-
-    # if st.button("Find Top Counselors"):
-    #     # Apply all filters at once to minimize API calls
-    #     if fao_package_available:
-    #         fao_df_filtered = filter_counselors(
-    #             fao_df.copy(), 
-    #             selected_fao_package, 
-    #             selected_timezone, 
-    #             selected_student_type
-    #         )
-    #         if 'fao_points' in st.session_state:
-    #             fao_df_filtered = calculate_score(fao_df_filtered, st.session_state['fao_points'])
-    #         fao_df_filtered = sort_counselors(fao_df_filtered, selected_fao_package)
-    #         st.session_state['fao_top_matches'] = fao_df_filtered.head(3)
-        
-    #     if gc_package_available:
-    #         gc_df_filtered = filter_counselors(
-    #             gc_df.copy(), 
-    #             selected_gc_package, 
-    #             selected_timezone, 
-    #             selected_student_type
-    #         )
-    #         if 'gc_points' in st.session_state:
-    #             gc_df_filtered = calculate_score(gc_df_filtered, st.session_state['gc_points'])
-    #         gc_df_filtered = sort_counselors(gc_df_filtered, selected_gc_package)
-    #         st.session_state['gc_top_matches'] = gc_df_filtered.head(3)
-        
-    #     # Filter incompatible pairs after all other filters
-    #     if fao_package_available and gc_package_available and 'fao_top_matches' in st.session_state and 'gc_top_matches' in st.session_state:
-    #         fao_filtered, gc_filtered = filter_incompatible_pairs(
-    #             st.session_state['fao_top_matches'].copy(),
-    #             st.session_state['gc_top_matches'].copy()
-    #         )
-    #         st.session_state['fao_top_matches'] = fao_filtered
-    #         st.session_state['gc_top_matches'] = gc_filtered
-        
-    #     st.session_state['show_results'] = True
-
-    # if st.session_state.get('show_results'):
-    #     st.header("Top Counselor Matches")
-    #     cols = st.columns(2) if fao_package_available and gc_package_available else [st.container()]
-
-    #     if fao_package_available and 'fao_top_matches' in st.session_state:
-    #         with cols[0]:
-    #             display_counselors(st.session_state['fao_top_matches'], 'FAO')
-
-    #     if gc_package_available and 'gc_top_matches' in st.session_state:
-    #         with cols[1] if fao_package_available else cols[0]:
-    #             display_counselors(st.session_state['gc_top_matches'], 'GC')
-
-    # if st.button("Return to Login"):
-    #     st.session_state.clear()
-    #     st.rerun()
