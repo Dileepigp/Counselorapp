@@ -134,14 +134,35 @@ if st.session_state["authenticated"]:
     other_schools = all_colleges - (ivy_colleges | top10_colleges | liberal_arts_colleges | hypsm_colleges | top20_colleges)
 
     # Create a dictionary for grouped options
+
+
     grouped_credentials = {
         "IVY Colleges": sorted(ivy_colleges & all_colleges),
         "Top 10 Universities": sorted(top10_colleges & all_colleges),
         "Liberal Arts Colleges": sorted(liberal_arts_colleges & all_colleges),
         "HYPSM": sorted(hypsm_colleges & all_colleges),
-        "Top 20 Universities": sorted(top20_colleges & all_colleges),
-        "Other Schools": sorted(other_schools)
+        "Top 20 Universities": sorted(top20_colleges & all_colleges)
     }
+
+    # Get the complete list of colleges from rankings
+    complete_college_list = sorted(all_colleges)
+
+    # Function to get selected colleges based on dropdown choice
+    def get_selected_colleges(choice, max_selections=3):
+        if choice in grouped_credentials:
+            if choice in ["IVY Colleges", "Top 10 Universities", "Liberal Arts Colleges", 
+                        "HYPSM", "Top 20 Universities", "All Colleges"]:
+                # These are group selections - return all colleges in the group
+                return grouped_credentials[choice]
+            else:
+                # For "Other Schools" or if we need individual selection
+                return st.multiselect(
+                    f"Select up to {max_selections} colleges from {choice}",
+                    grouped_credentials[choice],
+                    key=f"{choice}_selection",
+                    max_selections=max_selections
+                )
+        return []
 
     # Standard cleaning for both DataFrames
     for df in [fao_df, gc_df]:
@@ -545,12 +566,16 @@ if st.session_state["authenticated"]:
         st.session_state["show_gc_priority"] = False
 
     # FAO Section
+# Replace the current FAO credentials and admission sections with:
+
+    # FAO Section
+
     if fao_package_available:
         with col1:
             with st.expander("FAO Counselors Section", expanded=True):
                 st.subheader("Preferences for FAO Counselors")
                 
-                # FAO Preferences for traits and subjects (multiselect with max 3)
+                # FAO Preferences for traits and subjects
                 fao_preferences = {
                     'FAO Personality Traits': st.multiselect(
                         "Select preferred personality traits (FAO)", 
@@ -566,34 +591,69 @@ if st.session_state["authenticated"]:
                     )
                 }
 
-                # === CREDENTIALS (Grouped Select) ===
-                fao_credentials_group = st.selectbox(
-                    "Select a College Group for Credentials (FAO)", 
-                    list(fao_credentials.keys()), 
-                    key="fao_group"
+                # === CREDENTIALS SELECTION ===
+                st.markdown("#### Credentials Selection")
+                credential_group_options = ["Select Individual Colleges"] + list(grouped_credentials.keys())
+                fao_credential_mode = st.radio(
+                    "Select credential preference mode:",
+                    ["Choose from groups", "Select individual colleges"],
+                    key="fao_credential_mode",
+                    horizontal=True
                 )
-                fao_selected_credential = st.multiselect(
-                    "Select College from Group (FAO - Credential)", 
-                    options=fao_credentials[fao_credentials_group], 
-                    key="fao_credentials",max_selections=3
-                )
+                
+                if fao_credential_mode == "Choose from groups":
+                    # Group selection - single select
+                    fao_credential_choice = st.selectbox(
+                        "Select College Group for Credentials (FAO)",
+                        list(grouped_credentials.keys()),
+                        key="fao_credential_group"
+                    )
+                    fao_selected_credential = grouped_credentials[fao_credential_choice]
+                else:
+                    # Individual college selection - multiselect
+                    fao_selected_credential = st.multiselect(
+                        "Select up to 3 colleges (FAO - Credential)",
+                        sorted(all_colleges),
+                        key="fao_credentials_selection",
+                        max_selections=3
+                    )
+                
                 if fao_selected_credential:
-                    fao_preferences['Credentials'] = [fao_selected_credential]  # store as list to reuse existing logic
+                    fao_preferences['Credentials'] = [fao_selected_credential]
 
-                # === ADMISSION EXPERIENCE (Grouped Select) ===
-                fao_admission_group = st.selectbox(
-                    "Select a College Group for Admission Results (FAO)", 
-                    list(grouped_credentials.keys()), 
-                    key="fao_admission_group"
+                # === ADMISSION EXPERIENCE SELECTION ===
+                st.markdown("#### Admission Results Selection")
+                admission_group_options = ["Select Individual Colleges"] + list(grouped_credentials.keys())
+                fao_admission_mode = st.radio(
+                    "Select admission results preference mode:",
+                    ["Choose from groups", "Select individual colleges"],
+                    key="fao_admission_mode",
+                    horizontal=True
                 )
-                fao_Admission_experience = st.multiselect(
-                    "Select College from Group (FAO - Admission Result)", 
-                    options=grouped_credentials[fao_admission_group], 
-                    key="fao_Admission",max_selections=3
-                )
+                
+                if fao_admission_mode == "Choose from groups":
+                    # Group selection - single select
+                    fao_admission_choice = st.selectbox(
+                        "Select College Group for Admission Results (FAO)",
+                        list(grouped_credentials.keys()),
+                        key="fao_admission_group"
+                    )
+                    fao_Admission_experience = grouped_credentials[fao_admission_choice]
+                else:
+                    # Individual college selection - multiselect
+                    fao_Admission_experience = st.multiselect(
+                        "Select up to 3 colleges (FAO - Admission Result)",
+                        sorted(all_colleges),
+                        key="fao_admission_selection",
+                        max_selections=3
+                    )
 
                 if st.button("Rank Preferences for FAO"):
-                    st.session_state["show_fao_priority"] = True
+                    if (fao_admission_mode == "Select individual colleges" and len(fao_Admission_experience) > 3) or \
+                    (fao_credential_mode == "Select individual colleges" and len(fao_selected_credential) > 3):
+                        st.error("Please select no more than 3 colleges for each category")
+                    else:
+                        st.session_state["show_fao_priority"] = True
 
             if st.session_state["show_fao_priority"]:
                 st.subheader("Rank Preferences for FAO")
@@ -619,57 +679,89 @@ if st.session_state["authenticated"]:
 
                 st.session_state['fao_points'] = fao_points
 
-
-    # GC Section
+    # GC Section (similar structure as FAO)
     if gc_package_available:
         with col2:
             with st.expander("GC Counselors Section", expanded=True):
                 st.subheader("Preferences for GC Counselors")
 
-                # GC Preferences: traits and subjects
+                # GC Preferences for traits and subjects
                 gc_preferences = {
                     'GC Personality Traits': st.multiselect(
-                        "Select preferred personality traits (GC)",
-                        fao_traits_options,
-                        key="gc_traits",
+                        "Select preferred personality traits (GC)", 
+                        fao_traits_options, 
+                        key="gc_traits", 
                         max_selections=3
                     ),
                     'Subjects': st.multiselect(
-                        "Select subjects of interest (GC)",
-                        subjects_options,
-                        key="gc_subjects",
+                        "Select subjects of interest (GC)", 
+                        subjects_options, 
+                        key="gc_subjects", 
                         max_selections=3
                     )
                 }
 
-                # === CREDENTIALS (Grouped Select) ===
-                gc_credentials_group = st.selectbox(
-                    "Select a College Group for Credentials (GC)",
-                    list(gc_credentials.keys()),
-                    key="gc_group"
+                # === CREDENTIALS SELECTION ===
+                st.markdown("#### Credentials Selection")
+                gc_credential_mode = st.radio(
+                    "Select credential preference mode:",
+                    ["Choose from groups", "Select individual colleges"],
+                    key="gc_credential_mode",
+                    horizontal=True
                 )
-                gc_selected_credential = st.multiselect(
-                    "Select College from Group (GC - Credential)",
-                    options=gc_credentials[gc_credentials_group],
-                    key="gc_credentials",max_selections=3
-                )
+                
+                if gc_credential_mode == "Choose from groups":
+                    # Group selection - single select
+                    gc_credential_choice = st.selectbox(
+                        "Select College Group for Credentials (GC)",
+                        list(grouped_credentials.keys()),
+                        key="gc_credential_group"
+                    )
+                    gc_selected_credential = grouped_credentials[gc_credential_choice]
+                else:
+                    # Individual college selection - multiselect
+                    gc_selected_credential = st.multiselect(
+                        "Select up to 3 colleges (GC - Credential)",
+                        sorted(all_colleges),
+                        key="gc_credentials_selection",
+                        max_selections=3
+                    )
+                
                 if gc_selected_credential:
-                    gc_preferences['Credentials'] = [gc_selected_credential]  # store as list for scoring logic
+                    gc_preferences['Credentials'] = [gc_selected_credential]
 
-                # === ADMISSION EXPERIENCE (Grouped Select) ===
-                gc_admission_group = st.selectbox(
-                    "Select a College Group for Admission Results (GC)",
-                    list(grouped_credentials.keys()),
-                    key="gc_admission_group"
+                # === ADMISSION EXPERIENCE SELECTION ===
+                st.markdown("#### Admission Results Selection")
+                gc_admission_mode = st.radio(
+                    "Select admission results preference mode:",
+                    ["Choose from groups", "Select individual colleges"],
+                    key="gc_admission_mode",
+                    horizontal=True
                 )
-                gc_Admission_experience = st.multiselect(
-                    "Select College from Group (GC - Admission Result)",
-                    options=grouped_credentials[gc_admission_group],
-                    key="gc_Admission",max_selections=3
-                )
+                
+                if gc_admission_mode == "Choose from groups":
+                    # Group selection - single select
+                    gc_admission_choice = st.selectbox(
+                        "Select College Group for Admission Results (GC)",
+                        list(grouped_credentials.keys()),
+                        key="gc_admission_group"
+                    )
+                    gc_Admission_experience = grouped_credentials[gc_admission_choice]
+                else:
+                    # Individual college selection - multiselect
+                    gc_Admission_experience = st.multiselect(
+                        "Select up to 3 colleges (GC - Admission Result)",
+                        sorted(all_colleges),
+                        key="gc_admission_selection",
+                        max_selections=3
+                    )
 
                 if st.button("Rank Preferences for GC"):
-                    st.session_state["show_gc_priority"] = True
+                    if (gc_admission_mode == "Select individual colleges" and len(gc_Admission_experience) > 3) or \
+                    (gc_credential_mode == "Select individual colleges" and len(gc_selected_credential) > 3):
+                        st.error("Please select no more than 3 colleges for each category")
+                    else:
+                        st.session_state["show_gc_priority"] = True
 
             if st.session_state["show_gc_priority"]:
                 st.subheader("Rank Preferences for GC")
@@ -694,7 +786,6 @@ if st.session_state["authenticated"]:
                     gc_points[f"Admission Results: {gc_Admission_experience}"] = 10 * (num_categories + 1 - category_rank)
 
                 st.session_state['gc_points'] = gc_points
-
 
     def calculate_score(df, points):
         df["Score"] = 0
@@ -773,13 +864,31 @@ if st.session_state["authenticated"]:
         return df
 
     def sort_counselors(df, package_type):
-        # Filter out entries with zero or negative spots available
+        # First filter out entries with zero or negative spots available
         if "AC" in package_type and '# AC spots left after recommendations' in df.columns:
             df = df[df['# AC spots left after recommendations'] > 0]
-            return df.sort_values(by=['Score','# AC spots left after recommendations'], ascending=[False, False])
         elif "CB" in package_type and '# CB spots left after recommendations' in df.columns:
             df = df[df['# CB spots left after recommendations'] > 0]
-            return df.sort_values(by=['Score','# CB spots left after recommendations'], ascending=[False, False])
+        
+        # If all remaining counselors have score 0, sort purely by available spots
+        if 'Score' in df.columns and df['Score'].max() == 0:
+            if "AC" in package_type and '# AC spots left after recommendations' in df.columns:
+                return df.sort_values(by=['# AC spots left after recommendations'], ascending=False)
+            elif "CB" in package_type and '# CB spots left after recommendations' in df.columns:
+                return df.sort_values(by=['# CB spots left after recommendations'], ascending=False)
+        
+        # Normal case - sort by score first, then by spots if scores are equal
+        if "AC" in package_type and '# AC spots left after recommendations' in df.columns:
+            return df.sort_values(
+                by=['Score', '# AC spots left after recommendations'], 
+                ascending=[False, False]
+            )
+        elif "CB" in package_type and '# CB spots left after recommendations' in df.columns:
+            return df.sort_values(
+                by=['Score', '# CB spots left after recommendations'], 
+                ascending=[False, False]
+            )
+        
         return df  # Return the dataframe unmodified if conditions are not met
 
 
@@ -915,13 +1024,12 @@ if st.session_state["authenticated"]:
             <div class="profile-card" style="background-color: {'#ADD8E6' if is_selected else '#FFFFFF'};">
                 <div style="display: flex; justify-content: space-between; align-items: center;">
                     <h3>{row['Name']}</h3>
-                    <span style="font-weight: bold; color: #005CAA;">Score: {score}</span>
                 </div>
             """
 
             if counselor_type == 'FAO':
                 degree = row.get('Degree', '')
-                admission_experience = row.get('Admissions Experience', '')
+                admission_experience = row.get('Admissions Experience (Dileep)', '')
                 if degree:
                     counselor_card += f"<p><strong>Degree:</strong> {degree}</p>"
                 if admission_experience:
