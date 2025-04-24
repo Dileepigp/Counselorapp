@@ -58,7 +58,7 @@ if st.session_state["authenticated"]:
         scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
         creds = Credentials.from_service_account_file('keys.json', scopes=scope)
         st.session_state['client'] = gspread.authorize(creds)
-        st.session_state['spreadsheet'] = st.session_state['client'].open_by_key('19a7DqNpQHUdm4rV_1Em-IdfKMgnhwcARx9QhQUqlhNw')
+        st.session_state['spreadsheet'] = st.session_state['client'].open_by_key('19Ss02r7J93caq2aFxwv4F87OzeX0iIBpgf5v6v9dHTA')
         st.session_state['fao_worksheet'] = st.session_state['spreadsheet'].worksheet("UG FAOs")
         st.session_state['gc_worksheet'] = st.session_state['spreadsheet'].worksheet("US UG GCs")
         
@@ -137,7 +137,7 @@ if st.session_state["authenticated"]:
 
 
     grouped_credentials = {
-        "IVY Colleges": sorted(ivy_colleges & all_colleges),
+        "Ivy League": sorted(ivy_colleges & all_colleges),
         "Top 10 Universities": sorted(top10_colleges & all_colleges),
         "Liberal Arts Colleges": sorted(liberal_arts_colleges & all_colleges),
         "HYPSM": sorted(hypsm_colleges & all_colleges),
@@ -150,7 +150,7 @@ if st.session_state["authenticated"]:
     # Function to get selected colleges based on dropdown choice
     def get_selected_colleges(choice, max_selections=3):
         if choice in grouped_credentials:
-            if choice in ["IVY Colleges", "Top 10 Universities", "Liberal Arts Colleges", 
+            if choice in ["Ivy League", "Top 10 Universities", "Liberal Arts Colleges", 
                         "HYPSM", "Top 20 Universities", "All Colleges"]:
                 # These are group selections - return all colleges in the group
                 return grouped_credentials[choice]
@@ -596,12 +596,12 @@ if st.session_state["authenticated"]:
                 credential_group_options = ["Select Individual Colleges"] + list(grouped_credentials.keys())
                 fao_credential_mode = st.radio(
                     "Select credential preference mode:",
-                    ["Choose from groups", "Select individual colleges"],
+                    ["Select School Tier Category", "Select individual colleges"],
                     key="fao_credential_mode",
                     horizontal=True
                 )
                 
-                if fao_credential_mode == "Choose from groups":
+                if fao_credential_mode == "Select School Tier Category":
                     # Group selection - single select
                     fao_credential_choice = st.selectbox(
                         "Select College Group for Credentials (FAO)",
@@ -626,12 +626,12 @@ if st.session_state["authenticated"]:
                 admission_group_options = ["Select Individual Colleges"] + list(grouped_credentials.keys())
                 fao_admission_mode = st.radio(
                     "Select admission results preference mode:",
-                    ["Choose from groups", "Select individual colleges"],
+                    ["Select School Tier Category", "Select individual colleges"],
                     key="fao_admission_mode",
                     horizontal=True
                 )
                 
-                if fao_admission_mode == "Choose from groups":
+                if fao_admission_mode == "Select School Tier Category":
                     # Group selection - single select
                     fao_admission_choice = st.selectbox(
                         "Select College Group for Admission Results (FAO)",
@@ -705,12 +705,12 @@ if st.session_state["authenticated"]:
                 st.markdown("#### Credentials Selection")
                 gc_credential_mode = st.radio(
                     "Select credential preference mode:",
-                    ["Choose from groups", "Select individual colleges"],
+                    ["Select School Tier Category", "Select individual colleges"],
                     key="gc_credential_mode",
                     horizontal=True
                 )
                 
-                if gc_credential_mode == "Choose from groups":
+                if gc_credential_mode == "Select School Tier Category":
                     # Group selection - single select
                     gc_credential_choice = st.selectbox(
                         "Select College Group for Credentials (GC)",
@@ -734,12 +734,12 @@ if st.session_state["authenticated"]:
                 st.markdown("#### Admission Results Selection")
                 gc_admission_mode = st.radio(
                     "Select admission results preference mode:",
-                    ["Choose from groups", "Select individual colleges"],
+                    ["Select School Tier Category", "Select individual colleges"],
                     key="gc_admission_mode",
                     horizontal=True
                 )
                 
-                if gc_admission_mode == "Choose from groups":
+                if gc_admission_mode == "Select School Tier Category":
                     # Group selection - single select
                     gc_admission_choice = st.selectbox(
                         "Select College Group for Admission Results (GC)",
