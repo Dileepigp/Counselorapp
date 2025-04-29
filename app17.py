@@ -950,8 +950,8 @@ if st.session_state["authenticated"]:
             current_spots_left = get_float_value(row_index, spots_left_col_idx)
 
             # Update recommendation counts
-            worksheet.update_cell(row_index, recommended_col_idx, current_recommended + increment_value)
-            worksheet.update_cell(row_index, spots_left_col_idx, current_spots_left - decrement_value)
+            # worksheet.update_cell(row_index, recommended_col_idx, current_recommended + increment_value)
+            # worksheet.update_cell(row_index, spots_left_col_idx, current_spots_left - decrement_value)
 
             # Find the first empty student column
             student_col_idx = None
