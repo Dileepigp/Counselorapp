@@ -437,7 +437,10 @@ if st.session_state["authenticated"]:
         values = set()
         for val in df[column_name].dropna().unique():
             if isinstance(val, str):
-                values.update([v.strip() for v in val.split(',')])
+                # Skip "No available timezones" and empty strings
+                if val.strip().lower() == "no available timezones":
+                    continue
+                values.update([v.strip() for v in val.split(',') if v.strip()])
         return sorted(values)
 
     # Timezone selection
