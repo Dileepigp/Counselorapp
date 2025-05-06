@@ -90,6 +90,11 @@ if st.session_state["authenticated"]:
     fao_df = clean_counselor_data(st.session_state['fao_df'])
     gc_df = clean_counselor_data(st.session_state['gc_df'])
     college_rankings_df = clean_college_rankings(st.session_state['college_rankings_df'])
+
+    for df in [fao_df, gc_df]:
+        for col in ['# CB spots left after recommendations', '# AC spots left after recommendations']:
+            if col in df.columns:
+                df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
     # College groups
     ivy_colleges = {
         "Harvard University", "Yale University", "Princeton University",
