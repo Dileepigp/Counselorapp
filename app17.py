@@ -874,9 +874,9 @@ if st.session_state["authenticated"]:
     def sort_counselors(df, package_type):
         # First filter out entries with zero or negative spots available
         if "AC" in package_type and '# AC spots left after recommendations' in df.columns:
-            df = df[df['# AC spots left after recommendations'] > 0]
+            df = df[df['# AC spots left after recommendations'] > 0.5]
         elif "CB" in package_type and '# CB spots left after recommendations' in df.columns:
-            df = df[df['# CB spots left after recommendations'] > 0]
+            df = df[df['# CB spots left after recommendations'] > 0.5]
         
         # If all remaining counselors have score 0, sort purely by available spots
         if 'Score' in df.columns and df['Score'].max() == 0:
