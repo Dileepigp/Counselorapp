@@ -435,7 +435,12 @@ if st.session_state["authenticated"]:
         'Washington DC'
     ]
     responsible_region = st.selectbox("Select Responsible Region", responsible_regions)
-    hubspot_deal = st.text_input("Link to Hubspot Deal", type="password")
+    hubspot_deal = st.text_input("Link to Hubspot Deal")
+
+    # Validation to ensure Hubspot link is not empty
+    if not hubspot_deal.strip():
+        st.error("Hubspot Deal link cannot be empty. Please provide the link before proceeding.")
+        st.stop()
 
     # Function to extract unique values from a column
     def extract_unique_values(df, column_name):
