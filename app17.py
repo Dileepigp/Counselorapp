@@ -1127,7 +1127,7 @@ if st.session_state["authenticated"]:
                     fao_df_filtered = calculate_score(fao_df_filtered, st.session_state['fao_points'])
                 
                 fao_df_filtered = sort_counselors(fao_df_filtered, selected_fao_package)
-                st.session_state['fao_top_matches'] = fao_df_filtered.head(3)
+                st.session_state['fao_top_matches'] = fao_df_filtered.head(6)
             
             # Process GC counselors if package is available
             if gc_package_available:
@@ -1143,7 +1143,7 @@ if st.session_state["authenticated"]:
                     gc_df_filtered = calculate_score(gc_df_filtered, st.session_state['gc_points'])
                 
                 gc_df_filtered = sort_counselors(gc_df_filtered, selected_gc_package)
-                st.session_state['gc_top_matches'] = gc_df_filtered.head(3)
+                st.session_state['gc_top_matches'] = gc_df_filtered.head(6)
             
             # Handle incompatible counselor pairs
             if (fao_package_available and gc_package_available and 
